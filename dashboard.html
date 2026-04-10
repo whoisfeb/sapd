@@ -15,6 +15,7 @@
         input[type="text"], textarea, input[type="file"] { width: 100%; padding: 10px; background: #1a1a2e; border: 1px solid #30475e; border-radius: 5px; color: white; box-sizing: border-box; }
         textarea { resize: vertical; height: 80px; }
         .btn-absen { background: var(--primary); color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; transition: 0.3s; }
+        .btn-absen:hover { background: #ff5e78; }
         .btn-absen:disabled { background: #555; cursor: not-allowed; }
         .btn-admin { background: transparent; color: var(--primary); border: 2px solid var(--primary); padding: 10px 25px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 15px; display: none; text-decoration: none; text-align: center; box-sizing: border-box; transition: 0.3s; }
         .btn-admin:hover { background: var(--primary); color: white; }
@@ -65,11 +66,13 @@
     document.getElementById('user-name').innerText = userName || "User";
     document.getElementById('user-pangkat').innerText = userPangkat || "-";
 
+    // Proteksi Hari Minggu
     if (new Date().getDay() === 0) {
         document.getElementById('absensi-section').style.display = 'none';
         document.getElementById('holiday-section').style.display = 'block';
     }
 
+    // Tampilkan Tombol Admin jika pangkat High Command
     function checkAdmin() {
         const adminLink = document.getElementById('link-admin');
         const roles = ["CHIEF OF POLICE", "DEPUTY CHIEF OF POLICE", "ASSISTANT CHIEF OF POLICE", "COMMANDER"];
@@ -86,9 +89,9 @@
         const fileInput = document.getElementById('bukti-foto');
         const btn = document.getElementById('btn-submit');
 
-        if (!jam || !kegiatan || !fileInput.files[0]) return alert("Data belum lengkap!");
+        if (!jam || !kegiatan || !fileInput.files[0]) return alert("Lengkapi data!");
 
-        btn.disabled = true; btn.innerText = "Sabar, lagi upload...";
+        btn.disabled = true; btn.innerText = "Lagi upload...";
 
         try {
             const file = fileInput.files[0];
