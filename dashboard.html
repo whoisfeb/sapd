@@ -116,7 +116,7 @@
         try {
             // Upload ke Supabase Storage
             const { data: storageData, error: storageError } = await _supabase.storage
-                .from('absensi-bukti')
+                .from('bukti-absen')
                 .upload(fileName, file);
 
             if (storageError) throw storageError;
