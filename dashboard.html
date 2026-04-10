@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SAPD - Portal Absensi & Kehadiran</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-client@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --primary: #e94560;
@@ -81,7 +81,7 @@
             padding: 15px;
             border: 1px dashed var(--primary);
             border-radius: 8px;
-            display: none; /* Hidden by default */
+            display: none; 
             text-align: center;
         }
 
@@ -128,7 +128,7 @@
 </div>
 
 <script>
-    // 1. Ambil URL Parameters dari Auth-Callback
+    // 1. Ambil Parameter
     const params = new URLSearchParams(window.location.search);
     const userId = params.get('id');
     const userName = params.get('name');
@@ -136,29 +136,28 @@
     const userDivisi = JSON.parse(params.get('divisi') || "[]");
     const isAdmin = params.get('admin') === 'true';
 
-    // 2. Tampilkan Data di UI
-    document.getElementById('disp-name').innerText = userName || "Unknown";
+    // 2. Update UI
+    document.getElementById('disp-name').innerText = userName || "Guest";
     document.getElementById('disp-pangkat').innerText = "Rank: " + (userPangkat || "Unassigned");
     document.getElementById('disp-divisi').innerText = "Div: " + (userDivisi.length > 0 ? userDivisi.join(", ") : "General Duty");
 
-    // 3. Cek Role Admin (High Command)
     if (isAdmin) {
         document.getElementById('adminPanel').style.display = 'block';
     }
 
-    // 4. Inisialisasi Supabase
-    // Ambil URL & Key dari Environment Variables yang sudah Anda set di Netlify
+    // 3. Inisialisasi Supabase (PERBAIKAN: Menggunakan window.supabase)
     const SUPABASE_URL = "https://urclmvdkfkfwvdascobs.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4"; // Paste Anon Key Supabase Anda
-    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4";
+    
+    // Pastikan library dimuat dulu baru panggil createClient
+    const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Fungsi Toggle Textarea Alasan
     function toggleAlasan() {
         const tipe = document.getElementById('tipe_absen').value;
         document.getElementById('box-alasan').style.display = (tipe === 'Hadir') ? 'none' : 'block';
     }
 
-    // 5. Proses Kirim Data
+    // 4. Proses Submit
     document.getElementById('absenForm').onsubmit = async (e) => {
         e.preventDefault();
         const btn = document.getElementById('btnSubmit');
@@ -175,31 +174,33 @@
         btn.disabled = true;
         btn.innerText = "MENGIRIM...";
 
-        const { error } = await _supabase.from('absensi_sapd').insert([{
-            discord_id: userId,
-            nama_anggota: userName,
-            pangkat: userPangkat,
-            divisi: userDivisi,
-            tipe_absen: tipe,
-            alasan: ket
-        }]);
+        try {
+            const { error } = await _supabase.from('absensi_sapd').insert([{
+                discord_id: userId,
+                nama_anggota: userName,
+                pangkat: userPangkat,
+                divisi: userDivisi,
+                tipe_absen: tipe,
+                alasan: ket
+            }]);
 
-        if (error) {
-            msg.style.color = "red";
-            msg.innerText = "Error: " + error.message;
-            btn.disabled = false;
-            btn.innerText = "COBA LAGI";
-        } else {
+            if (error) throw error;
+
             msg.style.color = "#00ff00";
             msg.innerText = "Laporan berhasil dikirim!";
             btn.style.display = "none";
             document.getElementById('absenForm').reset();
+        } catch (err) {
+            msg.style.color = "red";
+            msg.innerText = "Error: " + err.message;
+            btn.disabled = false;
+            btn.innerText = "COBA LAGI";
         }
     };
 
+    // 5. Link ke Rekap (PERBAIKAN: Membawa data admin)
     function lihatRekap() {
-        // Arahkan ke halaman rekap jika Anda sudah membuatnya nanti
-        alert("Fitur Rekap sedang dikembangkan oleh Internal Affairs.");
+        window.location.href = 'rekap.html' + window.location.search;
     }
 </script>
 
