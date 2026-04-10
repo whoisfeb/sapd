@@ -1,20 +1,20 @@
-<div class="container">
-    <h2>Sistem Absensi Khusus</h2>
-    <p>Silakan login untuk memverifikasi role Anda.</p>
-    
-    <a href="https://discord.com/api/oauth2/authorize?client_id=ID_ANDA&redirect_uri=URL_REDIRECT&response_type=code&scope=identify" 
-       style="background: #5865F2; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
-        Login with Discord
-    </a>
-
-    <div id="msg"></div>
-</div>
-
-<script>
-    // Cek pesan error dari URL
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('error') === 'no_role') {
-        document.getElementById('msg').innerText = "Maaf, Anda tidak memiliki akses ke sistem ini.";
-        document.getElementById('msg').style.color = "red";
-    }
-</script>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SAPD Attendance - Login</title>
+    <style>
+        body { background: #1a1a2e; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-card { background: #16213e; padding: 40px; border-radius: 10px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .btn-discord { background: #5865F2; color: white; padding: 15px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h1>SAPD SYSTEM</h1>
+        <p>Silakan login menggunakan akun Discord untuk verifikasi role.</p>
+        <a href="https://discord.com/api/oauth2/authorize?client_id=ID_CLIENT_ANDA&redirect_uri=https://URL_NETLIFY_ANDA/.netlify/functions/auth-callback&response_type=code&scope=identify" class="btn-discord">
+            Login with Discord
+        </a>
+    </div>
+</body>
+</html>
