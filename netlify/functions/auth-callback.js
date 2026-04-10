@@ -8,7 +8,7 @@ exports.handler = async (event) => {
     if (!code) return { statusCode: 400, body: "Authorization code missing" };
 
     try {
-        // 1. Tukar code dengan token
+        // 1. Tukar code dengan token OAuth2
         const tokenRes = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({
             client_id: process.env.DISCORD_CLIENT_ID,
             client_secret: process.env.DISCORD_CLIENT_SECRET,
@@ -20,22 +20,37 @@ exports.handler = async (event) => {
 
         const accessToken = tokenRes.data.access_token;
 
-        // 2. Ambil ID User
+        // 2. Ambil ID User yang sedang login
         const userRes = await axios.get('https://discord.com/api/users/@me', {
             headers: { Authorization: `Bearer ${accessToken}` }
         });
         const userId = userRes.data.id;
 
-        // 3. Ambil Nickname & Role dari Server
+        // 3. Ambil data member langsung dari API Discord (Real-time)
+        // Kita menggunakan Bot Token agar bisa melihat role member tersebut
         const memberRes = await axios.get(
             `https://discord.com/api/v10/guilds/${process.env.DISCORD_GUILD_ID}/members/${userId}`,
             { headers: { Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}` } }
         );
 
-        const { nick, roles, user } = memberRes.data;
-        const displayName = nick || user.global_name || user.username;
+        const { nick, roles, user: userData } = memberRes.data;
+        const displayName = nick || userData.global_name || userData.username;
 
-        // --- MAPPING PANGKAT ---
+        // --- VALIDASI ROLE INTI MENGGUNAKAN ENV NETLIFY ---
+        const REQUIRED_ROLE_ID = process.env.DISCORD_REQUIRED_ROLE_ID; 
+        const hasRequiredRole = roles.includes(REQUIRED_ROLE_ID);
+
+        if (!hasRequiredRole) {
+            // JIKA TIDAK PUNYA ROLE: Hapus dari tabel master dan tolak login
+            await supabase.from('users_master').delete().eq('discord_id', userId);
+            
+            return {
+                statusCode: 403,
+                body: "AKSES DITOLAK: Anda tidak memiliki Role Inti yang terdaftar di sistem."
+            };
+        }
+
+        // --- MAPPING DATA (PANGKAT & DIVISI) ---
         const PANGKAT_MAP = {
             "1444909938001580257": "CHIEF OF POLICE",
             "1444909771181522974": "ASSISTANT CHIEF OF POLICE",
@@ -59,7 +74,6 @@ exports.handler = async (event) => {
             "1444920482578173953": "CADET"
         };
 
-        // --- MAPPING DIVISI ---
         const DIVISI_MAP = {
             "1444920880370159617": "METROPOLITAN",
             "1444920955620032533": "RAMPART DIVISION",
@@ -68,35 +82,27 @@ exports.handler = async (event) => {
             "1444921352120434819": "INTERNAL AFFAIRS DIVISION"
         };
 
-        const ADMIN_ROLE_ID = "1444910578266148897"; 
-
         let userPangkat = "Unknown";
-        let userDivisi = [];
-        let isAdmin = false;
+        let userDivisi = "-";
+        const adminRoleId = "1444910578266148897";
+        let isAdmin = roles.includes(adminRoleId);
 
         roles.forEach(r => {
             if (PANGKAT_MAP[r]) userPangkat = PANGKAT_MAP[r];
-            if (DIVISI_MAP[r]) userDivisi.push(DIVISI_MAP[r]);
-            if (r === ADMIN_ROLE_ID) isAdmin = true;
+            if (DIVISI_MAP[r]) userDivisi = DIVISI_MAP[r];
         });
 
-        // --- LOGIKA BARU: UPDATE BUKU INDUK ANGGOTA ---
-        // Ini akan menyimpan data user ke tabel users_master agar sistem monitoring rekap 
-        // tahu siapa saja anggota yang aktif
-        try {
-            await supabase.from('users_master').upsert({
-                discord_id: userId,
-                nama_anggota: displayName,
-                pangkat: userPangkat,
-                last_login: new Date().toISOString()
-            }, { onConflict: 'discord_id' }); // Update jika discord_id sudah ada
-        } catch (dbErr) {
-            console.error("Gagal update Buku Induk:", dbErr);
-            // Tetap lanjut redirect meskipun gagal update master agar user tidak stuck
-        }
+        // UPDATE DATA DI BUKU INDUK (users_master)
+        await supabase.from('users_master').upsert({
+            discord_id: userId,
+            nama_anggota: displayName,
+            pangkat: userPangkat,
+            divisi: userDivisi,
+            last_login: new Date().toISOString()
+        });
 
-        // 4. Redirect ke Dashboard
-        const redirectUrl = `/dashboard.html?id=${userId}&name=${encodeURIComponent(displayName)}&pangkat=${encodeURIComponent(userPangkat)}&divisi=${encodeURIComponent(JSON.stringify(userDivisi))}&admin=${isAdmin}`;
+        // 4. Redirect ke Dashboard dengan data yang sudah diverifikasi
+        const redirectUrl = `/dashboard.html?id=${userId}&name=${encodeURIComponent(displayName)}&pangkat=${encodeURIComponent(userPangkat)}&divisi=${encodeURIComponent(userDivisi)}&admin=${isAdmin}`;
         
         return {
             statusCode: 302,
@@ -104,7 +110,10 @@ exports.handler = async (event) => {
         };
 
     } catch (err) {
-        console.error(err);
-        return { statusCode: 500, body: "Login Failed" };
+        console.error("Login Error:", err);
+        return { 
+            statusCode: 500, 
+            body: "Terjadi kesalahan saat memproses login. Pastikan bot Discord aktif." 
+        };
     }
 };
