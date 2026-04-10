@@ -28,6 +28,8 @@
         .check-icon { color: #2ecc71; font-weight: bold; font-size: 1.2em; }
         .cross-icon { color: #e94560; opacity: 0.3; font-size: 1.1em; }
         .nav-btn-small { background: #30475e; color: white; border: none; padding: 8px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .unwarn-link { color: #e94560; font-size: 10px; text-decoration: none; margin-top: 4px; display: block; }
+        .unwarn-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -86,17 +88,7 @@
     };
 
     let currentWeekOffset = 0;
-    let userWeekly = {}; // Global variable to store current view data
-
-    function getWeekRange(offset = 0) {
-        const now = new Date();
-        now.setDate(now.getDate() + (offset * 7));
-        const day = now.getDay();
-        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-        const mon = new Date(now.setDate(diff)); mon.setHours(0,0,0,0);
-        const sun = new Date(mon); sun.setDate(mon.getDate() + 6); sun.setHours(23,59,59,999);
-        return { mon, sun };
-    }
+    let userWeekly = {}; 
 
     async function loadData() {
         const { mon, sun } = getWeekRange(currentWeekOffset);
@@ -126,9 +118,14 @@
             let totalGaji = (gajiPokok / 5) * Math.min(u.totalHadir, 5);
             if (u.totalHadir >= 6) totalGaji += 10000;
 
+            const cWarn = m.total_warning || 0;
             const warnBtn = (u.totalHadir < 3) 
-                ? `<button class="btn-warning" onclick="sendWarning('${m.discord_id}', '${m.nama_anggota}')">⚠️ Warning</button>` 
+                ? `<div style="display:flex; flex-direction:column; align-items:center;">
+                    <button class="btn-warning" onclick="sendWarning('${m.discord_id}', '${m.nama_anggota}', ${cWarn})">⚠️ Warning (${cWarn})</button>
+                    ${cWarn > 0 ? `<a href="#" class="unwarn-link" onclick="removeWarning('${m.discord_id}', '${m.nama_anggota}', ${cWarn})">[ Cabut SP ]</a>` : ''}
+                   </div>` 
                 : `<span style="color:gray">Aktif</span>`;
+            
             const icon = (idx) => u.days[idx] ? `<span class="check-icon">✔</span>` : `<span class="cross-icon">✘</span>`;
 
             return `<tr>
@@ -138,17 +135,16 @@
                 <td>${u.totalHadir}/6</td>
                 <td class="salary-text">$${Math.floor(totalGaji).toLocaleString()}</td>
                 <td>${warnBtn}</td>
-                <td><button onclick="resetUser('${u.info.discord_id}')" style="background:none;border:none;cursor:pointer;font-size:1.2em;">🗑</button></td>
+                <td><button onclick="resetUser('${u.info.discord_id}')" style="background:none;border:none;cursor:pointer;">🗑</button></td>
             </tr>`;
         }).join('');
     }
 
-    // --- FITUR WARNING SECURE (Via Netlify Function) ---
-    async function sendWarning(discord_id, nama_anggota) {
+    // --- FUNGSI WARNING (TAMBAH) ---
+    async function sendWarning(discord_id, nama_anggota, currentWarn) {
+        if (!confirm(`Kirim SP-${currentWarn + 1} ke Discord?`)) return;
         const { mon } = getWeekRange(currentWeekOffset);
         const u = userWeekly[discord_id];
-        if (!u) return alert("Data tidak ditemukan.");
-
         const daftarBolos = [];
         const namaHari = ["", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
         
@@ -156,107 +152,107 @@
             if (!u.days[i]) {
                 const tgl = new Date(mon);
                 tgl.setDate(mon.getDate() + (i - 1));
-                const formatTgl = tgl.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
-                daftarBolos.push(`- ${namaHari[i]}, ${formatTgl}`);
+                daftarBolos.push(`- ${namaHari[i]}, ${tgl.toLocaleDateString('id-ID', {day:'2-digit', month:'long'})}`);
             }
         }
 
+        const newWarnCount = currentWarn + 1;
         const payload = {
             "content": "@everyone <@&1444908462067945623>",
             "embeds": [{
-                "title": "📋 SURAT PERINGATAN (SP)",
+                "title": `📋 SURAT PERINGATAN (SP - ${newWarnCount})`,
                 "color": 15285324,
-                "description": `**Tanggal:** ${new Date().toLocaleDateString('id-ID', {day:'2-digit', month:'long', year:'numeric'})}\n**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat:** ${u.info.pangkat}\n**Total Warning:** 1 (Satu)\n\n**Alasan Peringatan:**\nTidak mengisi kehadiran selama **${daftarBolos.length} hari** minggu ini:\n${daftarBolos.join('\n')}\n\n**Pemberi Peringatan:** Admin System\n**Pangkat:** Internal Affairs`,
-                "footer": { "text": "SAPD Administrative Portal" },
+                "description": `**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat:** ${u.info.pangkat}\n**Total Warning:** ${newWarnCount}\n\n**Alasan:** Bolos ${daftarBolos.length} hari:\n${daftarBolos.join('\n')}`,
                 "timestamp": new Date()
             }]
         };
 
         try {
-            const response = await fetch('/.netlify/functions/send-warning', {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
-            if (response.ok) alert(`✅ SP Berhasil dikirim ke Discord untuk ${nama_anggota}`);
-            else alert("❌ Gagal mengirim. Cek konfigurasi Environment Variable Netlify.");
-        } catch (e) { alert("❌ Error sistem saat mengirim warning."); }
+            const res = await fetch('/.netlify/functions/send-warning', { method: 'POST', body: JSON.stringify(payload) });
+            if (res.ok) {
+                await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
+                loadData();
+            }
+        } catch (e) { alert("Error!"); }
     }
 
-    // --- EKSPOR EXCEL RAPI ---
+    // --- FUNGSI UNWARNING (CABUT) ---
+    async function removeWarning(discord_id, nama_anggota, currentWarn) {
+        if (!confirm(`Cabut SP untuk ${nama_anggota}? (Sisa: ${currentWarn - 1})`)) return;
+        const newWarnCount = currentWarn - 1;
+        const payload = {
+            "content": "<@&1444908462067945623>",
+            "embeds": [{
+                "title": "🔓 PENCABUTAN SURAT PERINGATAN",
+                "color": 3066993,
+                "description": `**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Status:** 1 Peringatan telah dicabut.\n**Sisa Total Warning:** ${newWarnCount}`,
+                "timestamp": new Date()
+            }]
+        };
+        try {
+            const res = await fetch('/.netlify/functions/send-warning', { method: 'POST', body: JSON.stringify(payload) });
+            if (res.ok) {
+                await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
+                loadData();
+            }
+        } catch (e) { alert("Error!"); }
+    }
+
+    // --- EKSPOR RAPI ---
     function downloadExcel() {
         const table = document.getElementById("table-rekap");
         const dateRange = document.getElementById('label-minggu').innerText;
         const rows = [];
-        
         const headers = [];
         table.querySelectorAll("thead th").forEach((th, idx) => { if(idx < 11) headers.push(th.innerText); });
         rows.push(headers);
-
         table.querySelectorAll("tbody tr").forEach(tr => {
             const rowData = [];
             tr.querySelectorAll("td").forEach((td, idx) => {
                 if (idx < 11) {
-                    let text = td.innerText.trim();
-                    if (td.querySelector('.check-icon')) text = "V";
-                    if (td.querySelector('.cross-icon')) text = "-";
-                    if (text.includes("Warning")) text = "WARN";
-                    rowData.push(text);
+                    let txt = td.innerText.split('\n')[0].trim();
+                    if (td.querySelector('.check-icon')) txt = "V";
+                    if (td.querySelector('.cross-icon')) txt = "-";
+                    rowData.push(txt);
                 }
             });
             rows.push(rowData);
         });
-
         const ws = XLSX.utils.aoa_to_sheet(rows);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Rekap_Gaji");
-        ws['!cols'] = [{wch:25}, {wch:20}, {wch:5}, {wch:5}, {wch:5}, {wch:5}, {wch:5}, {wch:5}, {wch:10}, {wch:15}, {wch:10}];
-        XLSX.writeFile(wb, `Rekap_SAPD_${dateRange.replace(/ /g, '_')}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, "Rekap");
+        XLSX.writeFile(wb, `Rekap_SAPD_${dateRange}.xlsx`);
     }
 
-    // --- EKSPOR PDF RAPI ---
     function downloadPDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('l', 'mm', 'a4');
-        const dateRange = document.getElementById('label-minggu').innerText;
-
-        doc.setFontSize(16);
-        doc.text("REKAPITULASI GAJI & ABSENSI SAPD", 14, 15);
-        doc.setFontSize(10);
-        doc.text(`Periode: ${dateRange}`, 14, 22);
-
         doc.autoTable({
             html: '#table-rekap',
-            startY: 30,
-            theme: 'grid',
-            headStyles: { fillColor: [233, 69, 96], halign: 'center' },
-            styles: { fontSize: 8, cellPadding: 2 },
             columns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
             didParseCell: function(data) {
                 if (data.cell.section === 'body') {
-                    let raw = data.cell.raw;
-                    if (raw.querySelector && raw.querySelector('.check-icon')) data.cell.text = ['V'];
-                    else if (raw.querySelector && raw.querySelector('.cross-icon')) data.cell.text = ['-'];
-                    
-                    if (data.cell.text[0].includes("Warning")) data.cell.text = ['WARN'];
-                    if (data.column.index === 9) data.cell.styles.halign = 'right';
+                    if (data.cell.raw.querySelector && data.cell.raw.querySelector('.check-icon')) data.cell.text = ['V'];
+                    else if (data.cell.raw.querySelector && data.cell.raw.querySelector('.cross-icon')) data.cell.text = ['-'];
+                    if (data.cell.text[0].includes("Warning")) data.cell.text = [data.cell.text[0].split('Warning')[1].trim()];
                 }
             }
         });
-        doc.save(`Rekap_SAPD_${dateRange.replace(/ /g, '_')}.pdf`);
+        doc.save(`Rekap_SAPD.pdf`);
     }
 
-    async function resetAllWeeklyData() {
-        if (!confirm("Hapus semua data & foto minggu ini?")) return;
-        const { mon, sun } = getWeekRange(currentWeekOffset);
-        const { data: logs } = await _supabase.from('absensi_sapd').select('bukti_foto').gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
-        const paths = logs.filter(l => l.bukti_foto && l.bukti_foto !== "N/A").map(l => l.bukti_foto.split('/bukti-absen/')[1]);
-        if (paths.length > 0) await _supabase.storage.from('bukti-absen').remove(paths);
-        await _supabase.from('absensi_sapd').delete().gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
-        loadData();
+    function getWeekRange(offset = 0) {
+        const now = new Date();
+        now.setDate(now.getDate() + (offset * 7));
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+        const mon = new Date(now.setDate(diff)); mon.setHours(0,0,0,0);
+        const sun = new Date(mon); sun.setDate(mon.getDate() + 6); sun.setHours(23,59,59,999);
+        return { mon, sun };
     }
-
+    
     async function resetUser(id) {
-        if (!confirm("Hapus data anggota ini di periode ini?")) return;
+        if (!confirm("Hapus data anggota periode ini?")) return;
         const { mon, sun } = getWeekRange(currentWeekOffset);
         await _supabase.from('absensi_sapd').delete().eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
         loadData();
