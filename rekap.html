@@ -37,7 +37,7 @@
     <div class="header-area">
         <div>
             <h2 style="margin: 0;">SAPD ADMIN - REKAP & PAYROLL</h2>
-            <p style="color: #888; margin: 5px 0 0 0;">Sistem Manajemen Warning & Payroll Otomatis</p>
+            <p style="color: #888; margin: 5px 0 0 0;">Status: I (Izin), C (Cuti), ✔ (Hadir), ✘ (Alpa)</p>
         </div>
         <div class="action-buttons">
             <a href="javascript:history.back()" class="btn btn-back">⬅ Dashboard</a>
@@ -125,8 +125,8 @@
                 <td class="salary-text">$${Math.floor(totalGaji).toLocaleString()}</td>
                 <td>
                     <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
-                        <button class="btn-warning" onclick="sendWarning('${m.discord_id}', '${m.nama_anggota}', ${cWarn})">⚠️ Warning (${cWarn})</button>
-                        ${cWarn > 0 ? `<span class="unwarn-link" onclick="removeWarning('${m.discord_id}', '${m.nama_anggota}', ${cWarn})">[ Cabut SP ]</span>` : ''}
+                        <button class="btn-warning" onclick="sendWarning('${m.discord_id}', '${m.nama_anggota}', '${m.pangkat}', ${cWarn})">⚠️ Warning (${cWarn})</button>
+                        ${cWarn > 0 ? `<span class="unwarn-link" onclick="removeWarning('${m.discord_id}', '${m.nama_anggota}', '${m.pangkat}', ${cWarn})">[ Cabut SP ]</span>` : ''}
                     </div>
                 </td>
                 <td><button onclick="resetUser('${m.discord_id}')" style="background:none;border:none;cursor:pointer;">🗑</button></td>
@@ -134,9 +134,10 @@
         }).join('');
     }
 
-    async function sendWarning(discord_id, nama_anggota, currentWarn) {
-        const adminName = prompt("Masukkan Nama Admin pemberi SP:", "Admin SAPD");
-        if (!adminName) return;
+    async function sendWarning(discord_id, nama_anggota, pangkat_anggota, currentWarn) {
+        const adminName = prompt("Masukkan Nama Admin pemberi SP:");
+        const adminRank = prompt("Masukkan Pangkat Admin pemberi SP:");
+        if (!adminName || !adminRank) return alert("Data Admin harus diisi!");
 
         if (!confirm(`Kirim SP-${currentWarn + 1} ke Discord?`)) return;
         
@@ -153,11 +154,11 @@
 
         const newWarnCount = currentWarn + 1;
         const logPayload = {
-            "content": "@everyone",
+            "content": "@everyone <@&1444908462067945623>",
             "embeds": [{
                 "title": `📋 SURAT PERINGATAN (SP - ${newWarnCount})`,
                 "color": 15285324,
-                "description": `**Target:** ${nama_anggota} (<@${discord_id}>)\n**Total SP:** ${newWarnCount}\n**Pemberi SP:** ${adminName}\n\n**Alasan:** Bolos kerja pada:\n${daftarBolos.join('\n')}`,
+                "description": `**Tanggal:** ${new Date().toLocaleDateString('id-ID')}\n**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat:** ${pangkat_anggota}\n\n**Alasan Peringatan:**\nTidak memenuhi kuota duty mingguan.\nDetail Bolos:\n${daftarBolos.join('\n')}\n\n**Pemberi Peringatan:** ${adminName}\n**Pangkat:** ${adminRank}`,
                 "timestamp": new Date()
             }]
         };
@@ -170,19 +171,20 @@
         if (res.ok) { alert("SP Terkirim!"); loadData(); }
     }
 
-    async function removeWarning(discord_id, nama_anggota, currentWarn) {
-        const adminName = prompt("Masukkan Nama Admin pencabut SP:", "Admin SAPD");
-        if (!adminName) return;
+    async function removeWarning(discord_id, nama_anggota, pangkat_anggota, currentWarn) {
+        const adminName = prompt("Masukkan Nama Admin pencabut SP:");
+        const adminRank = prompt("Masukkan Pangkat Admin pencabut SP:");
+        if (!adminName || !adminRank) return alert("Data Admin harus diisi!");
 
         if (!confirm(`Cabut SP untuk ${nama_anggota}?`)) return;
         const newWarnCount = Math.max(0, currentWarn - 1);
 
         const logPayload = {
-            "content": "",
+            "content": "<@&1444908462067945623>",
             "embeds": [{
                 "title": `🔓 PENCABUTAN SURAT PERINGATAN`,
                 "color": 3066993,
-                "description": `**Nama:** ${nama_anggota} (<@${discord_id}>)\n**Admin:** ${adminName}\n**Status:** 1 SP telah dicabut.\n**Sisa SP:** ${newWarnCount}`,
+                "description": `**Tanggal:** ${new Date().toLocaleDateString('id-ID')}\n**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat Anggota:** ${pangkat_anggota}\n\n**Status:** 1 SP telah dicabut.\n**Sisa SP:** ${newWarnCount}\n\n**Dicabut Oleh:** ${adminName}\n**Pangkat Admin:** ${adminRank}`,
                 "timestamp": new Date()
             }]
         };
@@ -206,7 +208,6 @@
         return txt.substring(0, 1990);
     }
 
-    // --- EXPORT TOOLS ---
     function downloadExcel() {
         const rows = [["Nama Anggota", "Pangkat", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Total", "Gaji"]];
         document.querySelectorAll("#tbody-weekly tr").forEach(tr => {
