@@ -23,8 +23,8 @@
 
 <div class="container">
     <div id="loading-screen" class="loading-screen">
-        <h3>Memverifikasi Akses...</h3>
-        <p style="font-size: 0.8em; color: #888;">Mohon tunggu sebentar.</p>
+        <h3>Memverifikasi Sesi...</h3>
+        <p style="font-size: 0.8em; color: #888;">Memastikan Anda masih memiliki akses Role Inti.</p>
     </div>
 
     <div id="main-content" style="display: none;">
@@ -51,7 +51,7 @@
 </div>
 
 <script>
-    // KONFIGURASI SUPABASE
+    // 1. KREDENSIAL SUPABASE
     const SUPABASE_URL = "https://urclmvdkfkfwvdascobs.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4"; 
     const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -59,52 +59,52 @@
     const urlParams = new URLSearchParams(window.location.search);
     const discordId = urlParams.get('id');
 
-    // 1. VERIFIKASI AKSES (Dijalankan saat halaman dibuka)
-    async function verifyAccess() {
+    // 2. FUNGSI PENGECEKAN KEAMANAN (REAL-TIME CHECK)
+    async function securityCheck() {
         if (!discordId) {
             window.location.href = "index.html";
-            return;
+            return false;
         }
 
+        // Cek langsung ke database master
         const { data: user, error } = await _supabase
             .from('users_master')
             .select('*')
             .eq('discord_id', discordId)
             .single();
 
+        // Jika user sudah tidak ada di master (berarti role sudah dicabut di Discord dan bot/backend sudah sinkron)
         if (error || !user) {
-            alert("AKSES DITOLAK: Anda tidak memiliki Role Inti atau akses Anda telah dicabut.");
+            alert("SESI BERAKHIR: Akses Anda telah dicabut oleh Admin. Anda akan dikeluarkan dari sistem.");
             window.location.href = "index.html";
-            return;
+            return false;
         }
 
-        // Tampilkan konten jika lolos verifikasi
-        document.getElementById('loading-screen').style.display = 'none';
-        document.getElementById('main-content').style.display = 'block';
+        // Tampilkan data ke UI
         document.getElementById('display-name').innerText = user.nama_anggota;
         document.getElementById('display-info').innerText = `${user.pangkat} | ${user.divisi}`;
+        return true;
     }
 
-    // 2. LOGIKA KIRIM ABSENSI + VALIDASI MENIT TERAKHIR
+    // 3. INISIALISASI HALAMAN
+    async function initDashboard() {
+        const isAuthorized = await securityCheck();
+        if (isAuthorized) {
+            document.getElementById('loading-screen').style.display = 'none';
+            document.getElementById('main-content').style.display = 'block';
+        }
+    }
+
+    // 4. LOGIKA KIRIM ABSENSI DENGAN VALIDASI DETIK TERAKHIR
     document.getElementById('absensi-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        
         const btn = document.getElementById('btn-kirim');
         const msg = document.getElementById('status-msg');
         
-        // --- SECURITY CHECK SAAT SUBMIT ---
-        // Mengecek apakah saat tombol ditekan, user masih punya role (ada di database)
-        const { data: activeUser, error: activeError } = await _supabase
-            .from('users_master')
-            .select('discord_id')
-            .eq('discord_id', discordId)
-            .single();
-
-        if (activeError || !activeUser) {
-            alert("SESI BERAKHIR: Akses Anda baru saja dicabut. Anda tidak dapat mengirim absensi.");
-            window.location.href = "index.html";
-            return;
-        }
-        // ----------------------------------
+        // --- VALIDASI ULANG SAAT KLIK TOMBOL KIRIM ---
+        const stillAuthorized = await securityCheck();
+        if (!stillAuthorized) return; 
 
         btn.disabled = true;
         btn.innerText = "Mengunggah Bukti...";
@@ -114,7 +114,7 @@
         const fileName = `absensi/${Date.now()}_${discordId}.png`;
 
         try {
-            // Upload ke Supabase Storage
+            // Upload Foto
             const { data: storageData, error: storageError } = await _supabase.storage
                 .from('bukti-absen')
                 .upload(fileName, file);
@@ -123,7 +123,7 @@
 
             const { data: publicUrl } = _supabase.storage.from('bukti-absen').getPublicUrl(fileName);
 
-            // Simpan ke Tabel Logs (absensi_sapd)
+            // Simpan Log Absensi
             const { error: insertError } = await _supabase.from('absensi_sapd').insert([{
                 discord_id: discordId,
                 nama_anggota: document.getElementById('display-name').innerText,
@@ -135,12 +135,11 @@
 
             if (insertError) throw insertError;
 
-            msg.innerText = "✔ Berhasil! Absensi telah tercatat.";
+            msg.innerText = "✔ Absensi Berhasil Terkirim!";
             msg.style.color = "#2ecc71";
             document.getElementById('absensi-form').reset();
 
         } catch (err) {
-            console.error(err);
             msg.innerText = "Gagal: " + err.message;
             msg.style.color = "#e94560";
         } finally {
@@ -149,8 +148,12 @@
         }
     });
 
-    // Jalankan verifikasi awal
-    verifyAccess();
+    // 5. HEARTBEAT: Cek status setiap 30 detik (Opsional tapi disarankan)
+    setInterval(async () => {
+        await securityCheck();
+    }, 30000); 
+
+    initDashboard();
 </script>
 
 </body>
