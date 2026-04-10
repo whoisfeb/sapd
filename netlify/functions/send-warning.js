@@ -1,25 +1,31 @@
-exports.handler = async (event, context) => {
-  // Hanya izinkan metode POST
-  if (event.httpMethod !== "POST") {
-    return { statusCode: 405, body: "Method Not Allowed" };
-  }
+exports.handler = async (event) => {
+  if (event.httpMethod !== "POST") return { statusCode: 405 };
+  
+  const WEBHOOK_URL = process.env.WARNING_WEBHOOK;
+  const MESSAGE_ID = process.env.warning_message_id; // ID pesan yang akan diedit
+  const body = JSON.parse(event.body);
 
   try {
-    const payload = JSON.parse(event.body);
-    const WEBHOOK_URL = process.env.WARNING_WEBHOOK; // Mengambil dari Env Netlify
-
-    const response = await fetch(WEBHOOK_URL, {
+    // 1. Kirim Log Peringatan (Pesan Baru)
+    await fetch(WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(body.payload)
     });
 
-    if (response.ok) {
-      return { statusCode: 200, body: JSON.stringify({ message: "Sent to Discord!" }) };
-    } else {
-      return { statusCode: 500, body: "Failed to send to Discord" };
+    // 2. Jika ada data untuk update daftar (Total Warning List)
+    if (body.updateList) {
+        // Kita gunakan PATCH untuk mengedit pesan yang sudah ada
+        // Catatan: Webhook hanya bisa edit pesan yang dibuat oleh dirinya sendiri
+        await fetch(`${WEBHOOK_URL}/messages/${MESSAGE_ID}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: body.updateList })
+        });
     }
-  } catch (error) {
-    return { statusCode: 500, body: error.toString() };
+
+    return { statusCode: 200, body: JSON.stringify({ status: "Success" }) };
+  } catch (err) {
+    return { statusCode: 500, body: err.toString() };
   }
 };
