@@ -3,35 +3,43 @@ exports.handler = async (event) => {
   const TOTAL_WEBHOOK = process.env.TOTAL_WARNING_WEBHOOK;
   const MESSAGE_ID = process.env.WARNING_MESSAGE_ID; 
 
-  // LOG INI AKAN MUNCUL DI HALAMAN HITAM NETLIFY TADI
-  console.log("--- DEBUG INFO ---");
-  console.log("ID Pesan:", MESSAGE_ID);
-  console.log("URL Webhook Log:", LOG_WEBHOOK ? "Tersedia" : "KOSONG!");
-  console.log("URL Webhook Total:", TOTAL_WEBHOOK ? "Tersedia" : "KOSONG!");
-  
+  console.log("--- DEBUG START ---");
   const body = JSON.parse(event.body);
 
   try {
-    // Jalankan pengiriman
-    const logRes = await fetch(LOG_WEBHOOK, {
+    // 1. Kirim Log Warning (Harusnya muncul di channel Log)
+    await fetch(LOG_WEBHOOK, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body.payload)
     });
 
-    if (body.updateList && MESSAGE_ID) {
-        console.log("Mencoba mengedit pesan ID:", MESSAGE_ID);
-        const editRes = await fetch(`${TOTAL_WEBHOOK}/messages/${MESSAGE_ID}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content: body.updateList })
-        });
-        console.log("Status Edit:", editRes.status, editRes.statusText);
+    // 2. Logika untuk Channel Total Warning
+    if (body.updateList) {
+        if (MESSAGE_ID && MESSAGE_ID.trim() !== "") {
+            // JIKA ADA ID -> EDIT
+            console.log("Mencoba EDIT pesan ID:", MESSAGE_ID);
+            const res = await fetch(`${TOTAL_WEBHOOK}/messages/${MESSAGE_ID}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: body.updateList })
+            });
+            console.log("Hasil Edit:", res.status, res.statusText);
+        } else {
+            // JIKA ID KOSONG -> KIRIM PESAN BARU
+            console.log("ID Kosong, mencoba KIRIM PESAN BARU ke Total Warning...");
+            const res = await fetch(TOTAL_WEBHOOK, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: body.updateList })
+            });
+            console.log("Hasil Kirim Baru:", res.status, res.statusText);
+        }
     }
 
-    return { statusCode: 200, body: "Check logs!" };
+    return { statusCode: 200, body: "Check log Netlify!" };
   } catch (err) {
-    console.error("ERROR TERJADI:", err.message);
+    console.error("CRASH TERJADI:", err.message);
     return { statusCode: 500, body: err.message };
   }
 };
