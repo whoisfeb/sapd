@@ -155,35 +155,84 @@
         }).join('');
     }
 
-    // --- FUNGSI DOWNLOAD ---
-    function downloadExcel() {
-        const table = document.querySelector("table");
-        const dateRange = document.getElementById('label-minggu').innerText;
-        const wb = XLSX.utils.table_to_book(table, { sheet: "Rekap Gaji" });
-        XLSX.writeFile(wb, `Rekap_SAPD_${dateRange.replace(/ /g, '_')}.xlsx`);
-    }
-
-    function downloadPDF() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('l', 'mm', 'a4');
-        const dateRange = document.getElementById('label-minggu').innerText;
-
-        doc.setFontSize(18);
-        doc.text("REKAPITULASI GAJI & ABSENSI SAPD", 14, 15);
-        doc.setFontSize(11);
-        doc.text(`Periode: ${dateRange}`, 14, 22);
-
-        doc.autoTable({
-            html: 'table',
-            startY: 30,
-            theme: 'grid',
-            headStyles: { fillColor: [233, 69, 96] },
-            didParseCell: function(data) {
-                if (data.column.index === 11) data.cell.text = ""; // Sembunyikan kolom "Aksi"
-            }
+    // --- FUNGSI DOWNLOAD EXCEL (Rapi) ---
+function downloadExcel() {
+    const table = document.querySelector("table");
+    const dateRange = document.getElementById('label-minggu').innerText;
+    
+    // Clone tabel agar kita bisa manipulasi tanpa merusak tampilan web
+    const tempTable = table.cloneNode(true);
+    
+    // Hapus kolom terakhir (Aksi) dari setiap baris di clone tabel
+    const rows = tempTable.querySelectorAll('tr');
+    rows.forEach(row => {
+        row.removeChild(row.lastElementChild); // Hapus kolom Aksi
+        
+        // Ubah icon centang/silang menjadi teks biasa
+        const cells = row.querySelectorAll('td');
+        cells.forEach(cell => {
+            if (cell.innerHTML.includes('✔')) cell.innerText = 'HADIR';
+            if (cell.innerHTML.includes('✘')) cell.innerText = '-';
+            // Hapus teks tombol warning jika ada
+            if (cell.innerHTML.includes('Warning')) cell.innerText = 'PERLU WARNING';
+            if (cell.innerText === 'Aman') cell.innerText = 'AKTIF';
         });
-        doc.save(`Rekap_SAPD_${dateRange.replace(/ /g, '_')}.pdf`);
-    }
+    });
+
+    const wb = XLSX.utils.table_to_book(tempTable, { sheet: "Rekap Gaji" });
+    XLSX.writeFile(wb, `Rekap_SAPD_${dateRange.replace(/ /g, '_')}.xlsx`);
+}
+
+// --- FUNGSI DOWNLOAD PDF (Rapi) ---
+function downloadPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('l', 'mm', 'a4');
+    const dateRange = document.getElementById('label-minggu').innerText;
+
+    doc.setFontSize(16);
+    doc.text("REKAPITULASI GAJI & ABSENSI SAPD", 14, 15);
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Periode: ${dateRange}`, 14, 22);
+
+    doc.autoTable({
+        html: 'table',
+        startY: 30,
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 3 },
+        headStyles: { fillColor: [233, 69, 96], textColor: [255, 255, 255], halign: 'center' },
+        columnStyles: {
+            0: { cellWidth: 45 }, // Nama
+            1: { cellWidth: 40 }, // Pangkat
+            8: { halign: 'center', fontStyle: 'bold' }, // Total Hadir
+            9: { halign: 'right', textColor: [39, 174, 96], fontStyle: 'bold' }, // Gaji
+            10: { halign: 'center' } // Status
+        },
+        // Filter isi sel agar tidak muncul karakter aneh (&p, icon, dll)
+        didParseCell: function(data) {
+            // 1. Sembunyikan kolom "Aksi" (index 11)
+            if (data.column.index === 11) {
+                data.cell.text = "";
+            }
+            
+            // 2. Ubah icon centang/silang jadi teks bersih
+            if (data.cell.section === 'body') {
+                let text = data.cell.text[0];
+                if (text.includes('✔')) data.cell.text = ['V'];
+                if (text.includes('✘')) data.cell.text = ['-'];
+                if (text.includes('Warning')) data.cell.text = ['Warning!'];
+                
+                // Rapikan tampilan gaji (tambahkan $)
+                if (data.column.index === 9 && !text.includes('$')) {
+                    data.cell.text = [`$${text}`];
+                }
+            }
+        },
+        margin: { top: 30 }
+    });
+
+    doc.save(`Rekap_SAPD_${dateRange.replace(/ /g, '_')}.pdf`);
+}
 
     async function resetAllWeeklyData() {
         if (!confirm("Hapus semua data absensi minggu ini? Gambar di storage juga akan dihapus.")) return;
