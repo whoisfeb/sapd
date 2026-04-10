@@ -2,71 +2,64 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>SAPD Admin - Rekap & Payroll Berurutan</title>
+    <title>SAPD Admin - Rekap & Payroll</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-    
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
     <style>
         :root { --primary: #e94560; --bg: #1a1a2e; --card: #16213e; --text: #ffffff; --success: #27ae60; --info: #2980b9; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); padding: 20px; }
-        
-        .header-area { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
-        .action-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
-        
-        .card { background: var(--card); padding: 20px; border-radius: 10px; margin-bottom: 20px; border-top: 4px solid var(--primary); overflow-x: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-        
-        table { width: 100%; border-collapse: collapse; font-size: 0.75em; min-width: 1200px; }
-        th, td { border: 1px solid #30475e; padding: 10px; text-align: center; }
-        th { background: #0f3460; position: sticky; top: 0; z-index: 10; }
-        
-        .btn { padding: 10px 18px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; color: white; transition: 0.2s; font-size: 0.85em; text-decoration: none; display: inline-block; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); padding: 20px; margin: 0; }
+        .header-area { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; gap: 10px; }
+        .action-buttons { display: flex; gap: 10px; }
+        .card { background: var(--card); padding: 20px; border-radius: 10px; border-top: 4px solid var(--primary); overflow-x: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        table { width: 100%; border-collapse: collapse; font-size: 0.8em; min-width: 1100px; }
+        th, td { border: 1px solid #30475e; padding: 12px 8px; text-align: center; }
+        th { background: #0f3460; position: sticky; top: 0; }
+        .btn { padding: 10px 16px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; color: white; transition: 0.2s; font-size: 0.85em; text-decoration: none; }
         .btn:hover { opacity: 0.8; transform: translateY(-1px); }
-        
         .btn-back { background: #444; }
         .btn-reset { background: var(--primary); }
         .btn-excel { background: var(--success); }
         .btn-pdf { background: var(--info); }
-        .btn-warning { background: #f39c12; padding: 4px 8px; cursor: pointer; border-radius: 3px; border:none; color:white; font-size: 0.9em; }
-        
+        .btn-warning { background: #f39c12; padding: 4px 8px; cursor: pointer; border-radius: 3px; border:none; color:white; }
         .salary-text { color: #2ecc71; font-weight: bold; }
-        .check-icon { color: #2ecc71; font-weight: bold; font-size: 1.2em; }
-        .cross-icon { color: #e94560; opacity: 0.3; font-size: 1.1em; }
+        .check-icon { color: #2ecc71; font-weight: bold; }
+        .cross-icon { color: #e94560; opacity: 0.3; }
         .nav-btn-small { background: #30475e; color: white; border: none; padding: 8px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        .nav-btn-small:hover { background: #4e6e8e; }
     </style>
 </head>
 <body>
 
     <div class="header-area">
         <div>
-            <h2 style="margin: 0 0 5px 0;">SAPD ADMIN - REKAP & PAYROLL</h2>
-            <p style="color: #888; margin: 0;">Kelola data kehadiran dan penggajian anggota secara otomatis.</p>
+            <h2 style="margin: 0;">SAPD ADMIN - REKAP & PAYROLL</h2>
+            <p style="color: #888; margin: 5px 0 0 0;">Sistem Manajemen Kehadiran dan Penggajian Otomatis</p>
         </div>
         <div class="action-buttons">
-            <a href="javascript:history.back()" class="btn btn-back">⬅ Kembali ke Dashboard</a>
-            <button class="btn btn-reset" onclick="resetAllWeeklyData()">🔥 Reset Minggu Ini</button>
+            <a href="javascript:history.back()" class="btn btn-back">⬅ Dashboard</a>
+            <button class="btn btn-reset" onclick="resetAllWeeklyData()">🔥 Reset Data</button>
             <button class="btn btn-excel" onclick="downloadExcel()">📊 Excel</button>
             <button class="btn btn-pdf" onclick="downloadPDF()">📄 PDF</button>
         </div>
     </div>
 
     <div class="card">
-        <div style="display:flex; justify-content:center; align-items:center; gap:25px; margin-bottom:20px;">
-            <button class="nav-btn-small" onclick="changeWeek(-1)">◀ Minggu Sebelumnya</button>
-            <h3 id="label-minggu" style="margin:0; min-width: 250px; text-align: center; color: #f39c12;">Memuat periode...</h3>
-            <button class="nav-btn-small" onclick="changeWeek(1)">Minggu Depan ▶</button>
+        <div style="display:flex; justify-content:center; align-items:center; gap:30px; margin-bottom:20px;">
+            <button class="nav-btn-small" onclick="changeWeek(-1)">◀ Prev</button>
+            <h3 id="label-minggu" style="margin:0; color: #f39c12;">Memuat periode...</h3>
+            <button class="nav-btn-small" onclick="changeWeek(1)">Next ▶</button>
         </div>
 
-        <table>
+        <table id="table-rekap">
             <thead>
                 <tr>
                     <th>Nama Anggota</th>
                     <th>Pangkat</th>
                     <th>Sen</th><th>Sel</th><th>Rab</th><th>Kam</th><th>Jum</th><th>Sab</th>
-                    <th>Total Hadir</th>
-                    <th>Estimasi Gaji</th>
+                    <th>Total</th>
+                    <th>Gaji</th>
                     <th>Status</th>
                     <th>Aksi</th>
                 </tr>
@@ -122,10 +115,7 @@
             const d = new Date(log.created_at).getDay();
             if (userWeekly[log.discord_id] && d !== 0) {
                 userWeekly[log.discord_id].days[d] = log.bukti_foto;
-                // Deteksi kehadiran aktif (bukan izin/cuti)
-                if (!log.jam_duty.includes("IZIN") && !log.jam_duty.includes("CUTI")) {
-                    userWeekly[log.discord_id].totalHadir++;
-                }
+                if (!log.jam_duty.includes("IZIN") && !log.jam_duty.includes("CUTI")) userWeekly[log.discord_id].totalHadir++;
             }
         });
 
@@ -135,130 +125,86 @@
             let totalGaji = (gajiPokok / 5) * Math.min(u.totalHadir, 5);
             if (u.totalHadir >= 6) totalGaji += 10000;
 
-            const warningBtn = (u.totalHadir < 3) 
-                ? `<button class="btn-warning" onclick="sendWarning('${u.info.discord_id}', '${u.info.nama_anggota}')">⚠️ Warning</button>` 
-                : `<span style="color:gray; font-size:0.9em;">Aman</span>`;
+            const warn = (u.totalHadir < 3) ? `<button class="btn-warning" onclick="sendWarning('${u.info.nama_anggota}')">⚠️ Warning</button>` : `<span style="color:gray">Aktif</span>`;
+            const icon = (idx) => u.days[idx] ? `<span class="check-icon">✔</span>` : `<span class="cross-icon">✘</span>`;
 
-            const renderIcon = (idx) => u.days[idx] ? `<span class="check-icon">✔</span>` : `<span class="cross-icon">✘</span>`;
-
-            return `
-                <tr>
-                    <td style="text-align:left;"><b>${u.info.nama_anggota}</b></td>
-                    <td>${u.info.pangkat}</td>
-                    <td>${renderIcon(1)}</td><td>${renderIcon(2)}</td><td>${renderIcon(3)}</td>
-                    <td>${renderIcon(4)}</td><td>${renderIcon(5)}</td><td>${renderIcon(6)}</td>
-                    <td>${u.totalHadir} / 6 Hari</td>
-                    <td class="salary-text">$${Math.floor(totalGaji).toLocaleString()}</td>
-                    <td>${warningBtn}</td>
-                    <td><button onclick="resetUser('${u.info.discord_id}')" style="background:none; border:none; cursor:pointer; font-size:1.2em;">🗑</button></td>
-                </tr>`;
+            return `<tr>
+                <td style="text-align:left;"><b>${u.info.nama_anggota}</b></td>
+                <td>${u.info.pangkat}</td>
+                <td>${icon(1)}</td><td>${icon(2)}</td><td>${icon(3)}</td><td>${icon(4)}</td><td>${icon(5)}</td><td>${icon(6)}</td>
+                <td>${u.totalHadir}/6</td>
+                <td class="salary-text">$${Math.floor(totalGaji).toLocaleString()}</td>
+                <td>${warn}</td>
+                <td><button onclick="resetUser('${u.info.discord_id}')" style="background:none;border:none;cursor:pointer;">🗑</button></td>
+            </tr>`;
         }).join('');
     }
 
-    // --- FUNGSI DOWNLOAD EXCEL (Rapi) ---
-function downloadExcel() {
-    const table = document.querySelector("table");
-    const dateRange = document.getElementById('label-minggu').innerText;
-    
-    // Clone tabel agar kita bisa manipulasi tanpa merusak tampilan web
-    const tempTable = table.cloneNode(true);
-    
-    // Hapus kolom terakhir (Aksi) dari setiap baris di clone tabel
-    const rows = tempTable.querySelectorAll('tr');
-    rows.forEach(row => {
-        row.removeChild(row.lastElementChild); // Hapus kolom Aksi
+    // --- EKSPOR RAPI ---
+    function downloadExcel() {
+        const table = document.getElementById("table-rekap");
+        const dateRange = document.getElementById('label-minggu').innerText;
+        const tempTable = table.cloneNode(true);
         
-        // Ubah icon centang/silang menjadi teks biasa
-        const cells = row.querySelectorAll('td');
-        cells.forEach(cell => {
-            if (cell.innerHTML.includes('✔')) cell.innerText = 'HADIR';
-            if (cell.innerHTML.includes('✘')) cell.innerText = '-';
-            // Hapus teks tombol warning jika ada
-            if (cell.innerHTML.includes('Warning')) cell.innerText = 'PERLU WARNING';
-            if (cell.innerText === 'Aman') cell.innerText = 'AKTIF';
+        tempTable.querySelectorAll('tr').forEach(row => {
+            row.removeChild(row.lastElementChild); // Hapus kolom Aksi
+            row.querySelectorAll('td, th').forEach(cell => {
+                if (cell.innerHTML.includes('✔')) cell.innerText = 'V';
+                if (cell.innerHTML.includes('✘')) cell.innerText = '-';
+                if (cell.innerHTML.includes('Warning')) cell.innerText = 'WARN';
+            });
         });
-    });
 
-    const wb = XLSX.utils.table_to_book(tempTable, { sheet: "Rekap Gaji" });
-    XLSX.writeFile(wb, `Rekap_SAPD_${dateRange.replace(/ /g, '_')}.xlsx`);
-}
+        const wb = XLSX.utils.table_to_book(tempTable, { sheet: "Rekap" });
+        XLSX.writeFile(wb, `Rekap_SAPD_${dateRange.replace(/ /g, '_')}.xlsx`);
+    }
 
-// --- FUNGSI DOWNLOAD PDF (Rapi) ---
-function downloadPDF() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('l', 'mm', 'a4');
-    const dateRange = document.getElementById('label-minggu').innerText;
+    function downloadPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'mm', 'a4');
+        const dateRange = document.getElementById('label-minggu').innerText;
 
-    doc.setFontSize(16);
-    doc.text("REKAPITULASI GAJI & ABSENSI SAPD", 14, 15);
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Periode: ${dateRange}`, 14, 22);
+        doc.text("REKAPITULASI GAJI & ABSENSI SAPD", 14, 15);
+        doc.setFontSize(10);
+        doc.text(`Periode: ${dateRange}`, 14, 22);
 
-    doc.autoTable({
-        html: 'table',
-        startY: 30,
-        theme: 'grid',
-        styles: { fontSize: 8, cellPadding: 3 },
-        headStyles: { fillColor: [233, 69, 96], textColor: [255, 255, 255], halign: 'center' },
-        columnStyles: {
-            0: { cellWidth: 45 }, // Nama
-            1: { cellWidth: 40 }, // Pangkat
-            8: { halign: 'center', fontStyle: 'bold' }, // Total Hadir
-            9: { halign: 'right', textColor: [39, 174, 96], fontStyle: 'bold' }, // Gaji
-            10: { halign: 'center' } // Status
-        },
-        // Filter isi sel agar tidak muncul karakter aneh (&p, icon, dll)
-        didParseCell: function(data) {
-            // 1. Sembunyikan kolom "Aksi" (index 11)
-            if (data.column.index === 11) {
-                data.cell.text = "";
-            }
-            
-            // 2. Ubah icon centang/silang jadi teks bersih
-            if (data.cell.section === 'body') {
-                let text = data.cell.text[0];
-                if (text.includes('✔')) data.cell.text = ['V'];
-                if (text.includes('✘')) data.cell.text = ['-'];
-                if (text.includes('Warning')) data.cell.text = ['Warning!'];
-                
-                // Rapikan tampilan gaji (tambahkan $)
-                if (data.column.index === 9 && !text.includes('$')) {
-                    data.cell.text = [`$${text}`];
+        doc.autoTable({
+            html: '#table-rekap',
+            startY: 30,
+            theme: 'grid',
+            headStyles: { fillColor: [233, 69, 96] },
+            columnStyles: { 9: { halign: 'right' } },
+            didParseCell: function(data) {
+                if (data.column.index === 11) data.cell.text = ""; 
+                if (data.cell.section === 'body') {
+                    let txt = data.cell.text[0];
+                    if (txt.includes('✔')) data.cell.text = ['V'];
+                    if (txt.includes('✘')) data.cell.text = ['-'];
+                    if (txt.includes('Warning')) data.cell.text = ['WARN'];
                 }
             }
-        },
-        margin: { top: 30 }
-    });
-
-    doc.save(`Rekap_SAPD_${dateRange.replace(/ /g, '_')}.pdf`);
-}
+        });
+        doc.save(`Rekap_SAPD_${dateRange.replace(/ /g, '_')}.pdf`);
+    }
 
     async function resetAllWeeklyData() {
-        if (!confirm("Hapus semua data absensi minggu ini? Gambar di storage juga akan dihapus.")) return;
+        if (!confirm("Hapus semua data & foto minggu ini?")) return;
         const { mon, sun } = getWeekRange(currentWeekOffset);
         const { data: logs } = await _supabase.from('absensi_sapd').select('bukti_foto').gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
-        
-        const filePaths = logs.filter(l => l.bukti_foto && l.bukti_foto !== "N/A").map(l => l.bukti_foto.split('/bukti-absen/')[1]);
-        if (filePaths.length > 0) await _supabase.storage.from('bukti-absen').remove(filePaths);
-
+        const paths = logs.filter(l => l.bukti_foto && l.bukti_foto !== "N/A").map(l => l.bukti_foto.split('/bukti-absen/')[1]);
+        if (paths.length > 0) await _supabase.storage.from('bukti-absen').remove(paths);
         await _supabase.from('absensi_sapd').delete().gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
-        alert("Pembersihan selesai.");
         loadData();
     }
 
-    function sendWarning(id, nama) {
-        alert(`Warning dikirim ke Discord: ${nama} (${id}) terdeteksi tidak aktif.`);
-    }
-
     async function resetUser(id) {
-        if(confirm("Hapus data anggota ini di minggu ini saja?")) {
-            const { mon, sun } = getWeekRange(currentWeekOffset);
-            await _supabase.from('absensi_sapd').delete().eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
-            loadData();
-        }
+        if (!confirm("Hapus data anggota ini?")) return;
+        const { mon, sun } = getWeekRange(currentWeekOffset);
+        await _supabase.from('absensi_sapd').delete().eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+        loadData();
     }
 
+    function sendWarning(nama) { alert(`Warning SP-1 untuk ${nama} diproses.`); }
     function changeWeek(dir) { currentWeekOffset += dir; loadData(); }
     loadData();
 </script>
