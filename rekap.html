@@ -2,55 +2,40 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>SAPD Admin - Rekap & Management</title>
+    <title>SAPD Admin - Rekap Detail</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #e94560; --bg: #1a1a2e; --card: #16213e; }
         body { font-family: sans-serif; background: var(--bg); color: white; padding: 20px; }
-        .card { background: var(--card); padding: 20px; border-radius: 10px; margin-bottom: 20px; border-top: 4px solid var(--primary); }
-        table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
-        th, td { border: 1px solid #30475e; padding: 10px; text-align: left; }
+        .card { background: var(--card); padding: 20px; border-radius: 10px; margin-bottom: 20px; border-top: 4px solid var(--primary); overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85em; min-width: 800px; }
+        th, td { border: 1px solid #30475e; padding: 12px; text-align: left; vertical-align: top; }
         th { background: #0f3460; }
-        .tab-btn { background: none; border: none; color: gray; cursor: pointer; font-size: 1.1em; margin-right: 20px; padding: 10px; }
-        .tab-btn.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
-        .btn-delete { background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
-        .btn-reset { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-bottom: 15px; }
-        .img-preview { color: #00d2ff; text-decoration: none; font-weight: bold; }
-        .badge-alpa { background: #dc3545; padding: 4px 8px; border-radius: 4px; font-size: 0.8em; }
+        .btn-reset { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-bottom: 15px; font-weight: bold; }
+        .img-link { color: #00d2ff; text-decoration: none; font-weight: bold; }
+        .text-kegiatan { max-width: 250px; word-wrap: break-word; font-style: italic; color: #ccc; }
     </style>
 </head>
 <body>
 
     <h2>SAPD ADMINISTRATIVE PANEL</h2>
 
-    <div class="tab-menu">
-        <button class="tab-btn active" onclick="showTab(event, 'tab-rekap')">Log & Gaji</button>
-        <button class="tab-btn" onclick="showTab(event, 'tab-monitoring')">Monitoring Alpa</button>
-    </div>
-
-    <div id="tab-rekap" class="tab-content">
-        <button class="btn-reset" onclick="hapusSemua()">Reset Seluruh Absensi Mingguan</button>
-        <div class="card">
-            <h3>Log Kehadiran & Gaji</h3>
-            <table id="table-rekap">
-                <thead>
-                    <tr><th>Tanggal</th><th>Nama</th><th>Pangkat</th><th>Foto</th><th>Gaji (Hadir)</th><th>Aksi</th></tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
-    </div>
-
-    <div id="tab-monitoring" class="tab-content" style="display:none;">
-        <div class="card">
-            <h3>Anggota Belum Absen Hari Ini</h3>
-            <table id="table-alpa">
-                <thead>
-                    <tr><th>Nama Anggota</th><th>Pangkat</th><th>Status</th></tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
+    <div class="card">
+        <h3>Log Absensi & Laporan Duty</h3>
+        <button class="btn-reset" onclick="hapusSemua()">Reset Absensi Mingguan</button>
+        <table id="table-rekap">
+            <thead>
+                <tr>
+                    <th>Waktu Input</th>
+                    <th>Nama & Pangkat</th>
+                    <th>Jam Duty</th>
+                    <th>Kegiatan</th>
+                    <th>Bukti</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
     </div>
 
 <script>
@@ -59,57 +44,32 @@
     const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     async function loadData() {
-        const { data: logs } = await _supabase.from('absensi_sapd').select('*').order('created_at', { ascending: false });
-        const { data: masters } = await _supabase.from('users_master').select('*');
+        const { data: logs, error } = await _supabase.from('absensi_sapd').select('*').order('created_at', { ascending: false });
+        if (error) return console.error(error);
 
-        // Render Tabel Rekap
-        const tbodyRekap = document.querySelector('#table-rekap tbody');
-        tbodyRekap.innerHTML = logs.map(row => {
-            const tgl = new Date(row.created_at).toLocaleDateString('id-ID');
-            return `
-                <tr>
-                    <td>${tgl}</td>
-                    <td>${row.nama_anggota}</td>
-                    <td>${row.pangkat}</td>
-                    <td><a href="${row.bukti_foto}" target="_blank" class="img-preview">Lihat Bukti</a></td>
-                    <td>$5.000</td>
-                    <td><button class="btn-delete" onclick="hapusData('${row.id}')">Hapus</button></td>
-                </tr>
-            `;
-        }).join('');
-
-        // Render Monitoring Alpa
-        const hariIni = new Date().toLocaleDateString('id-ID');
-        const idSudahAbsen = logs.filter(l => new Date(l.created_at).toLocaleDateString('id-ID') === hariIni).map(l => l.discord_id);
-        const bolos = masters.filter(m => !idSudahAbsen.includes(m.discord_id));
-
-        const tbodyAlpa = document.querySelector('#table-alpa tbody');
-        tbodyAlpa.innerHTML = bolos.map(m => `
+        const tbody = document.querySelector('#table-rekap tbody');
+        tbody.innerHTML = logs.map(row => `
             <tr>
-                <td>${m.nama_anggota}</td>
-                <td>${m.pangkat}</td>
-                <td><span class="badge-alpa">BELUM ABSEN</span></td>
+                <td>${new Date(row.created_at).toLocaleString('id-ID')}</td>
+                <td><b>${row.nama_anggota}</b><br><small>${row.pangkat}</small></td>
+                <td>${row.jam_duty || '-'}</td>
+                <td class="text-kegiatan">${row.kegiatan || '-'}</td>
+                <td><a href="${row.bukti_foto}" target="_blank" class="img-link">Lihat Foto</a></td>
+                <td><button onclick="hapusData('${row.id}')" style="background:#dc3545; color:white; border:none; border-radius:3px; cursor:pointer;">Hapus</button></td>
             </tr>
         `).join('');
     }
 
     async function hapusData(id) {
-        if(!confirm("Hapus data absen ini?")) return;
+        if(!confirm("Hapus laporan ini?")) return;
         await _supabase.from('absensi_sapd').delete().eq('id', id);
         loadData();
     }
 
     async function hapusSemua() {
-        if(!confirm("PERINGATAN: Ini akan menghapus SEMUA data absen di tabel (Reset Mingguan). Lanjut?")) return;
-        await _supabase.from('absensi_sapd').delete().neq('id', 0); // Menghapus semua baris
+        if(!confirm("Reset semua data minggu ini? (Data di users_master tetap aman)")) return;
+        await _supabase.from('absensi_sapd').delete().neq('id', 0);
         loadData();
-    }
-
-    function showTab(e, id) {
-        document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById(id).style.display = 'block';
-        e.target.classList.add('active');
     }
 
     loadData();
