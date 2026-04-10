@@ -2,53 +2,51 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>SAPD Admin - Full Logs & Monitoring</title>
+    <title>SAPD Admin - Weekly Rekap</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #e94560; --bg: #1a1a2e; --card: #16213e; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; padding: 20px; }
-        .card { background: var(--card); padding: 20px; border-radius: 10px; margin-bottom: 20px; border-top: 4px solid var(--primary); }
-        .filter-group { display: flex; gap: 15px; align-items: flex-end; margin-bottom: 20px; flex-wrap: wrap; }
-        .filter-group div { display: flex; flex-direction: column; gap: 5px; }
-        input[type="date"] { padding: 8px; border-radius: 5px; border: 1px solid #30475e; background: #1a1a2e; color: white; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.85em; margin-top: 10px; }
-        th, td { border: 1px solid #30475e; padding: 12px; text-align: left; }
-        th { background: #0f3460; text-transform: uppercase; }
+        .card { background: var(--card); padding: 20px; border-radius: 10px; margin-bottom: 20px; border-top: 4px solid var(--primary); overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.75em; min-width: 1000px; }
+        th, td { border: 1px solid #30475e; padding: 10px; text-align: center; }
+        th { background: #0f3460; }
         .tab-btn { background: none; border: none; color: gray; cursor: pointer; font-size: 1.1em; margin-right: 20px; padding-bottom: 5px; font-weight: bold; }
         .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
-        .badge-alpa { background: #dc3545; padding: 4px 10px; border-radius: 4px; font-weight: bold; }
-        .btn-action { padding: 8px 15px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; }
+        .check-icon { color: #2ecc71; font-weight: bold; font-size: 1.2em; }
+        .cross-icon { color: #e94560; font-weight: bold; opacity: 0.3; }
+        .btn-reset { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
-    <h2>SAPD ADMINISTRATIVE SYSTEM</h2>
+    <h2>SAPD ADMIN - WEEKLY MONITORING</h2>
 
     <div class="tab-menu" style="margin-bottom: 25px;">
-        <button class="tab-btn active" onclick="showTab(event, 'tab-rekap')">Riwayat Kehadiran (Logs)</button>
-        <button class="tab-btn" onclick="showTab(event, 'tab-monitoring')">Monitoring Alpa (Hari Ini)</button>
+        <button class="tab-btn active" onclick="showTab(event, 'tab-rekap')">Riwayat Minggu Ini</button>
+        <button class="tab-btn" onclick="showTab(event, 'tab-monitoring')">Alpa (Hari Ini)</button>
     </div>
 
     <div id="tab-rekap" class="tab-content">
         <div class="card">
-            <div class="filter-group">
-                <div>
-                    <label>Dari Tanggal:</label>
-                    <input type="date" id="filter-mulai">
-                </div>
-                <div>
-                    <label>Sampai Tanggal:</label>
-                    <input type="date" id="filter-selesai">
-                </div>
-                <button class="btn-action" style="background: var(--primary); color: white;" onclick="loadData()">Terapkan Filter</button>
-                <button class="btn-action" style="background: #30475e; color: white;" onclick="hapusSemua()">Reset Database</button>
-            </div>
-            
+            <h3 id="label-minggu">Memuat data minggu ini...</h3>
             <table>
                 <thead>
-                    <tr><th>Waktu Input</th><th>Nama Anggota</th><th>Pangkat</th><th>Jam Duty</th><th>Kegiatan</th><th>Bukti</th><th>Aksi</th></tr>
+                    <tr>
+                        <th>Nama</th>
+                        <th>Pangkat</th>
+                        <th>Divisi</th>
+                        <th>Sen</th>
+                        <th>Sel</th>
+                        <th>Rab</th>
+                        <th>Kam</th>
+                        <th>Jum</th>
+                        <th>Sab</th>
+                        <th>Min</th>
+                        <th>Aksi</th>
+                    </tr>
                 </thead>
-                <tbody id="tbody-rekap"></tbody>
+                <tbody id="tbody-weekly"></tbody>
             </table>
         </div>
     </div>
@@ -56,62 +54,108 @@
     <div id="tab-monitoring" class="tab-content" style="display:none;">
         <div class="card">
             <h3>Belum Absen Hari Ini (Role Inti)</h3>
-            <table>
+            <table id="table-alpa">
                 <thead>
-                    <tr><th>Nama Anggota</th><th>Pangkat</th><th>Divisi</th><th>Status</th></tr>
+                    <tr><th>Nama</th><th>Pangkat</th><th>Divisi</th><th>Status</th></tr>
                 </thead>
-                <tbody id="tbody-alpa"></tbody>
+                <tbody></tbody>
             </table>
         </div>
     </div>
 
 <script>
-    const _supabase = window.supabase.createClient("https://urclmvdkfkfwvdascobs.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4");
+    const _supabase = window.supabase.createClient("https://urclmvdkfkfwvdascobs.supabase.co", "ISI_ANON_KEY_KAMU");
 
-    async function loadData() {
-        const start = document.getElementById('filter-mulai').value;
-        const end = document.getElementById('filter-selesai').value;
-
-        // 1. Query Logs (dengan filter tanggal jika ada)
-        let query = _supabase.from('absensi_sapd').select('*').order('created_at', { ascending: false });
-        if (start) query = query.gte('created_at', `${start}T00:00:00`);
-        if (end) query = query.lte('created_at', `${end}T23:59:59`);
-
-        const { data: logs } = await query;
-        const { data: masters } = await _supabase.from('users_master').select('*');
-
-        // Render Logs
-        document.getElementById('tbody-rekap').innerHTML = (logs || []).map(row => `
-            <tr>
-                <td>${new Date(row.created_at).toLocaleString('id-ID')}</td>
-                <td><b>${row.nama_anggota}</b></td>
-                <td>${row.pangkat}</td>
-                <td>${row.jam_duty || '-'}</td>
-                <td style="max-width: 200px;">${row.kegiatan || '-'}</td>
-                <td><a href="${row.bukti_foto}" target="_blank" style="color: #00d2ff; text-decoration: none;">Lihat SS</a></td>
-                <td><button onclick="hapusData('${row.id}')" style="background:#dc3545; color:white; border:none; padding:5px; border-radius:3px; cursor:pointer;">Hapus</button></td>
-            </tr>
-        `).join('');
-
-        // Render Alpa (Selalu bandingkan dengan absensi HARI INI)
-        const hariIni = new Date().toLocaleDateString('id-ID');
-        const idSudahAbsen = (logs || [])
-            .filter(l => new Date(l.created_at).toLocaleDateString('id-ID') === hariIni)
-            .map(l => l.discord_id);
+    // Fungsi mendapatkan rentang tanggal minggu ini (Senin - Minggu)
+    function getWeekRange() {
+        const now = new Date();
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Penyesuaian ke hari Senin
+        const monday = new Date(now.setDate(diff));
+        monday.setHours(0,0,0,0);
         
-        const bolos = (masters || []).filter(m => !idSudahAbsen.includes(m.discord_id));
-        document.getElementById('tbody-alpa').innerHTML = bolos.length === 0 
-            ? `<tr><td colspan="4" style="text-align:center; padding:20px;">Role Inti sudah absen semua hari ini.</td></tr>`
-            : bolos.map(m => `<tr><td><b>${m.nama_anggota}</b></td><td>${m.pangkat}</td><td>${m.divisi}</td><td><span class="badge-alpa">ALPA</span></td></tr>`).join('');
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        sunday.setHours(23,59,59,999);
+        
+        return { monday, sunday };
     }
 
-    async function hapusData(id) { if(confirm("Hapus log?")) { await _supabase.from('absensi_sapd').delete().eq('id', id); loadData(); } }
-    async function hapusSemua() { if(confirm("Hapus SEMUA data di database?")) { await _supabase.from('absensi_sapd').delete().neq('id', 0); loadData(); } }
+    async function loadData() {
+        const { monday, sunday } = getWeekRange();
+        document.getElementById('label-minggu').innerText = `Periode: ${monday.toLocaleDateString()} - ${sunday.toLocaleDateString()}`;
+
+        // 1. Ambil data logs minggu ini & data master
+        const { data: logs } = await _supabase.from('absensi_sapd')
+            .select('*')
+            .gte('created_at', monday.toISOString())
+            .lte('created_at', sunday.toISOString());
+            
+        const { data: masters } = await _supabase.from('users_master').select('*');
+
+        // 2. Olah data logs menjadi format Mingguan per User
+        const userWeeklyData = {};
+        
+        // Inisialisasi semua anggota master agar muncul di tabel (meskipun belum absen)
+        masters.forEach(m => {
+            userWeeklyData[m.discord_id] = {
+                info: m,
+                days: { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null, 0: null }
+            };
+        });
+
+        // Isi data absensi ke dalam hari yang sesuai
+        logs.forEach(log => {
+            const logDate = new Date(log.created_at);
+            const dayNum = logDate.getDay(); // 0 = Minggu, 1 = Senin, dst.
+            if (userWeeklyData[log.discord_id]) {
+                userWeeklyData[log.discord_id].days[dayNum] = log.bukti_foto;
+            }
+        });
+
+        // 3. Render Tabel Weekly
+        document.getElementById('tbody-weekly').innerHTML = Object.values(userWeeklyData).map(u => {
+            const renderDay = (dayIndex) => {
+                return u.days[dayIndex] 
+                    ? `<a href="${u.days[dayIndex]}" target="_blank" class="check-icon">✔</a>` 
+                    : `<span class="cross-icon">✘</span>`;
+            };
+
+            return `
+                <tr>
+                    <td style="text-align:left;"><b>${u.info.nama_anggota}</b></td>
+                    <td>${u.info.pangkat}</td>
+                    <td>${u.info.divisi}</td>
+                    <td>${renderDay(1)}</td> <td>${renderDay(2)}</td> <td>${renderDay(3)}</td> <td>${renderDay(4)}</td> <td>${renderDay(5)}</td> <td>${renderDay(6)}</td> <td>${renderDay(0)}</td> <td><button onclick="resetUser('${u.info.discord_id}')" style="background:none; border:none; cursor:pointer;">🗑</button></td>
+                </tr>
+            `;
+        }).join('');
+
+        // 4. Render Alpa (Hari Ini Saja)
+        const hariIni = new Date().getDay();
+        const bolos = Object.values(userWeeklyData).filter(u => !u.days[hariIni]);
+        document.querySelector('#table-alpa tbody').innerHTML = bolos.map(u => `
+            <tr><td>${u.info.nama_anggota}</td><td>${u.info.pangkat}</td><td>${u.info.divisi}</td><td><span class="badge-alpa">ALPA</span></td></tr>
+        `).join('');
+    }
+
+    async function resetUser(discordId) {
+        if(confirm("Hapus seluruh log user ini untuk minggu ini?")) {
+            const { monday, sunday } = getWeekRange();
+            await _supabase.from('absensi_sapd').delete()
+                .eq('discord_id', discordId)
+                .gte('created_at', monday.toISOString())
+                .lte('created_at', sunday.toISOString());
+            loadData();
+        }
+    }
+
     function showTab(e, id) { 
         document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.getElementById(id).style.display = 'block'; e.target.classList.add('active');
     }
+
     loadData();
 </script>
 </body>
