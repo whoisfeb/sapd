@@ -140,10 +140,11 @@
         }).join('');
     }
 
-    // Fungsi Update Daftar di Discord (Urutan & Tagging Aman)
+    // Fungsi Update Daftar di Discord (Urut Pangkat tapi Pangkat tidak ditulis)
     async function updateDiscordList() {
         const { data: masters } = await _supabase.from('users_master').select('nama_anggota, pangkat, total_warning, discord_id');
         
+        // Tetap diurutkan agar Chief di atas, Cadet di bawah
         masters.sort((a, b) => {
             const rankA = RANK_ORDER[a.pangkat.toUpperCase()] || 99;
             const rankB = RANK_ORDER[b.pangkat.toUpperCase()] || 99;
@@ -157,16 +158,16 @@
             const w = m.total_warning || 0;
             const emoji = w >= 3 ? "🔴" : (w > 0 ? "🟡" : "🟢");
             
-            // Proteksi jika discord_id tidak ada agar tidak Error 400
-            const tag = (m.discord_id && !isNaN(m.discord_id)) ? `<@${m.discord_id}>` : `*No ID*`;
+            // Proteksi ID Discord agar tidak error 400
+            const tag = (m.discord_id && !isNaN(m.discord_id)) ? `<@${m.discord_id}>` : `*ID Missing*`;
             
-            listText += `${emoji} **${m.pangkat}** | ${m.nama_anggota} (${tag}) : \`${w} SP\`\n`;
+            // Format: Nama (Tag) : SP
+            listText += `${emoji} ${m.nama_anggota} (${tag}) : \`${w} SP\`\n`;
         });
 
         listText += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
         listText += `*Terakhir diperbarui: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB*`;
         
-        // Memastikan tidak lebih dari 2000 karakter (limit Discord)
         return listText.substring(0, 1990);
     }
 
@@ -205,7 +206,7 @@
             });
 
             if (res.ok) {
-                alert(`✅ BERHASIL: SP-${newWarnCount} terkirim!`);
+                alert(`✅ BERHASIL: SP-${newWarnCount} terkirim & Daftar diperbarui!`);
                 loadData();
             }
         } catch (e) { alert("Error!"); }
@@ -231,11 +232,12 @@
                 method: 'POST', 
                 body: JSON.stringify({ payload: logPayload, updateList: newList }) 
             });
-            alert("✅ BERHASIL: SP dicabut!");
+            alert("✅ BERHASIL: SP dicabut & Daftar diperbarui!");
             loadData();
         } catch (e) { alert("Error!"); }
     }
 
+    // --- TOOLS ---
     function downloadExcel() {
         const table = document.getElementById("table-rekap");
         const rows = [["Nama Anggota", "Pangkat", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Total", "Gaji", "Status"]];
