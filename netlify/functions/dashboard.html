@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAPD - Portal Absensi & Kehadiran</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-client@2"></script>
+    <style>
+        :root {
+            --primary: #e94560;
+            --secondary: #0f3460;
+            --bg: #1a1a2e;
+            --card: #16213e;
+            --text: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .card {
+            background: var(--card);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border-top: 6px solid var(--primary);
+        }
+
+        .profile-box {
+            background: var(--secondary);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .profile-box h2 { margin: 0; font-size: 1.4em; color: var(--primary); }
+        .profile-box p { margin: 5px 0 0; font-size: 0.9em; opacity: 0.8; }
+
+        label { display: block; margin-top: 15px; font-weight: bold; font-size: 0.9em; }
+
+        select, textarea, button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 8px;
+            border-radius: 6px;
+            border: 1px solid #30475e;
+            background: #1a1a2e;
+            color: white;
+            box-sizing: border-box;
+            font-size: 1em;
+        }
+
+        textarea { height: 100px; resize: none; }
+
+        button {
+            background: var(--primary);
+            border: none;
+            font-weight: bold;
+            margin-top: 25px;
+            cursor: pointer;
+            transition: 0.3s;
+            text-transform: uppercase;
+        }
+
+        button:hover { background: #ff2e63; transform: translateY(-2px); }
+
+        .admin-panel {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px dashed var(--primary);
+            border-radius: 8px;
+            display: none; /* Hidden by default */
+            text-align: center;
+        }
+
+        .status-msg {
+            margin-top: 15px;
+            text-align: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <div class="profile-box">
+            <h2 id="disp-name">Loading...</h2>
+            <p id="disp-pangkat">Rank: -</p>
+            <p id="disp-divisi" style="font-style: italic; font-size: 0.8em;">Division: -</p>
+        </div>
+
+        <form id="absenForm">
+            <label>Jenis Kehadiran</label>
+            <select id="tipe_absen" required onchange="toggleAlasan()">
+                <option value="Hadir">Hadir (On Duty)</option>
+                <option value="Izin">Izin (Sakit/Keperluan)</option>
+                <option value="Cuti">Cuti (Long Term)</option>
+            </select>
+
+            <div id="box-alasan" style="display: none;">
+                <label>Alasan / Keterangan</label>
+                <textarea id="alasan" placeholder="Tulis alasan Anda di sini..."></textarea>
+            </div>
+
+            <button type="submit" id="btnSubmit">Kirim Laporan</button>
+        </form>
+
+        <div id="statusMsg" class="status-msg"></div>
+
+        <div id="adminPanel" class="admin-panel">
+            <p style="color: var(--primary); font-weight: bold; margin: 0;">HIGH COMMAND ACCESS</p>
+            <button onclick="lihatRekap()" style="background: #30475e; font-size: 0.8em; margin-top: 10px;">Lihat Rekap Seluruh Anggota</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. Ambil URL Parameters dari Auth-Callback
+    const params = new URLSearchParams(window.location.search);
+    const userId = params.get('id');
+    const userName = params.get('name');
+    const userPangkat = params.get('pangkat');
+    const userDivisi = JSON.parse(params.get('divisi') || "[]");
+    const isAdmin = params.get('admin') === 'true';
+
+    // 2. Tampilkan Data di UI
+    document.getElementById('disp-name').innerText = userName || "Unknown";
+    document.getElementById('disp-pangkat').innerText = "Rank: " + (userPangkat || "Unassigned");
+    document.getElementById('disp-divisi').innerText = "Div: " + (userDivisi.length > 0 ? userDivisi.join(", ") : "General Duty");
+
+    // 3. Cek Role Admin (High Command)
+    if (isAdmin) {
+        document.getElementById('adminPanel').style.display = 'block';
+    }
+
+    // 4. Inisialisasi Supabase
+    // Ambil URL & Key dari Environment Variables yang sudah Anda set di Netlify
+    const SUPABASE_URL = "https://urclmvdkfkfwvdascobs.supabase.co";
+    const SUPABASE_KEY = "MASUKKAN_ANON_KEY_ANDA_DI_SINI"; // Paste Anon Key Supabase Anda
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Fungsi Toggle Textarea Alasan
+    function toggleAlasan() {
+        const tipe = document.getElementById('tipe_absen').value;
+        document.getElementById('box-alasan').style.display = (tipe === 'Hadir') ? 'none' : 'block';
+    }
+
+    // 5. Proses Kirim Data
+    document.getElementById('absenForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('btnSubmit');
+        const msg = document.getElementById('statusMsg');
+
+        const tipe = document.getElementById('tipe_absen').value;
+        const ket = document.getElementById('alasan').value;
+
+        if ((tipe === 'Izin' || tipe === 'Cuti') && !ket) {
+            alert("Harap isi alasan jika Izin atau Cuti!");
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerText = "MENGIRIM...";
+
+        const { error } = await _supabase.from('absensi_sapd').insert([{
+            discord_id: userId,
+            nama_anggota: userName,
+            pangkat: userPangkat,
+            divisi: userDivisi,
+            tipe_absen: tipe,
+            alasan: ket
+        }]);
+
+        if (error) {
+            msg.style.color = "red";
+            msg.innerText = "Error: " + error.message;
+            btn.disabled = false;
+            btn.innerText = "COBA LAGI";
+        } else {
+            msg.style.color = "#00ff00";
+            msg.innerText = "Laporan berhasil dikirim!";
+            btn.style.display = "none";
+            document.getElementById('absenForm').reset();
+        }
+    };
+
+    function lihatRekap() {
+        // Arahkan ke halaman rekap jika Anda sudah membuatnya nanti
+        alert("Fitur Rekap sedang dikembangkan oleh Internal Affairs.");
+    }
+</script>
+
+</body>
+</html>
