@@ -28,7 +28,7 @@
         .check-icon { color: #2ecc71; font-weight: bold; font-size: 1.2em; }
         .cross-icon { color: #e94560; opacity: 0.3; font-size: 1.1em; }
         .nav-btn-small { background: #30475e; color: white; border: none; padding: 8px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        .unwarn-link { color: #e94560; font-size: 10px; text-decoration: none; margin-top: 4px; display: block; }
+        .unwarn-link { color: #e94560; font-size: 10px; text-decoration: none; margin-top: 4px; display: block; cursor: pointer; }
         .unwarn-link:hover { text-decoration: underline; }
     </style>
 </head>
@@ -37,7 +37,7 @@
     <div class="header-area">
         <div>
             <h2 style="margin: 0;">SAPD ADMIN - REKAP & PAYROLL</h2>
-            <p style="color: #888; margin: 5px 0 0 0;">Sistem Manajemen Kehadiran dan Penggajian Otomatis</p>
+            <p style="color: #888; margin: 5px 0 0 0;">Manajemen Warning & Payroll Otomatis</p>
         </div>
         <div class="action-buttons">
             <a href="javascript:history.back()" class="btn btn-back">⬅ Dashboard</a>
@@ -50,7 +50,7 @@
     <div class="card">
         <div style="display:flex; justify-content:center; align-items:center; gap:30px; margin-bottom:20px;">
             <button class="nav-btn-small" onclick="changeWeek(-1)">◀ Prev</button>
-            <h3 id="label-minggu" style="margin:0; color: #f39c12; min-width: 250px; text-align: center;">Memuat periode...</h3>
+            <h3 id="label-minggu" style="margin:0; color: #f39c12; min-width: 250px; text-align: center;">Memuat...</h3>
             <button class="nav-btn-small" onclick="changeWeek(1)">Next ▶</button>
         </div>
 
@@ -122,7 +122,7 @@
             const warnBtn = (u.totalHadir < 3) 
                 ? `<div style="display:flex; flex-direction:column; align-items:center;">
                     <button class="btn-warning" onclick="sendWarning('${m.discord_id}', '${m.nama_anggota}', ${cWarn})">⚠️ Warning (${cWarn})</button>
-                    ${cWarn > 0 ? `<a href="#" class="unwarn-link" onclick="removeWarning('${m.discord_id}', '${m.nama_anggota}', ${cWarn})">[ Cabut SP ]</a>` : ''}
+                    ${cWarn > 0 ? `<span class="unwarn-link" onclick="removeWarning('${m.discord_id}', '${m.nama_anggota}', ${cWarn})">[ Cabut SP ]</span>` : ''}
                    </div>` 
                 : `<span style="color:gray">Aktif</span>`;
             
@@ -140,7 +140,22 @@
         }).join('');
     }
 
-    // --- FUNGSI WARNING (TAMBAH) ---
+    // Fungsi Update Daftar di Discord
+    async function updateDiscordList() {
+        const { data: masters } = await _supabase.from('users_master').select('nama_anggota, total_warning');
+        masters.sort((a, b) => (b.total_warning || 0) - (a.total_warning || 0));
+
+        let listText = "**📊 DAFTAR TOTAL WARNING ANGGOTA SAPD**\n\n";
+        masters.forEach(m => {
+            const w = m.total_warning || 0;
+            const emoji = w >= 3 ? "🔴" : (w > 0 ? "🟡" : "🟢");
+            listText += `${emoji} ${m.nama_anggota} : **${w}**\n`;
+        });
+        listText += `\n*Terakhir diperbarui: ${new Date().toLocaleString('id-ID')}*`;
+        return listText;
+    }
+
+    // ACTION: TAMBAH WARNING
     async function sendWarning(discord_id, nama_anggota, currentWarn) {
         if (!confirm(`Kirim SP-${currentWarn + 1} ke Discord?`)) return;
         const { mon } = getWeekRange(currentWeekOffset);
@@ -152,47 +167,60 @@
             if (!u.days[i]) {
                 const tgl = new Date(mon);
                 tgl.setDate(mon.getDate() + (i - 1));
-                daftarBolos.push(`- ${namaHari[i]}, ${tgl.toLocaleDateString('id-ID', {day:'2-digit', month:'long'})}`);
+                daftarBolos.push(`- ${namaHari[i]}, ${tgl.toLocaleDateString('id-ID')}`);
             }
         }
 
         const newWarnCount = currentWarn + 1;
-        const payload = {
+        const logPayload = {
             "content": "@everyone <@&1444908462067945623>",
             "embeds": [{
                 "title": `📋 SURAT PERINGATAN (SP - ${newWarnCount})`,
                 "color": 15285324,
-                "description": `**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat:** ${u.info.pangkat}\n**Total Warning:** ${newWarnCount}\n\n**Alasan:** Bolos ${daftarBolos.length} hari:\n${daftarBolos.join('\n')}`,
+                "description": `**Nama:** ${nama_anggota} (<@${discord_id}>)\n**Total SP:** ${newWarnCount}\n**Alasan:** Bolos ${daftarBolos.length} hari:\n${daftarBolos.join('\n')}`,
                 "timestamp": new Date()
             }]
         };
 
         try {
-            const res = await fetch('/.netlify/functions/send-warning', { method: 'POST', body: JSON.stringify(payload) });
+            await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
+            const newList = await updateDiscordList();
+            const res = await fetch('/.netlify/functions/send-warning', { 
+                method: 'POST', 
+                body: JSON.stringify({ payload: logPayload, updateList: newList }) 
+            });
+
             if (res.ok) {
-                await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
+                alert(`✅ BERHASIL: SP-${newWarnCount} terkirim & daftar diperbarui!`);
                 loadData();
             }
         } catch (e) { alert("Error!"); }
     }
 
-    // --- FUNGSI UNWARNING (CABUT) ---
+    // ACTION: CABUT WARNING
     async function removeWarning(discord_id, nama_anggota, currentWarn) {
-        if (!confirm(`Cabut SP untuk ${nama_anggota}? (Sisa: ${currentWarn - 1})`)) return;
-        const newWarnCount = currentWarn - 1;
-        const payload = {
+        if (!confirm(`Cabut SP untuk ${nama_anggota}?`)) return;
+        const newWarnCount = Math.max(0, currentWarn - 1);
+        const logPayload = {
             "content": "<@&1444908462067945623>",
             "embeds": [{
                 "title": "🔓 PENCABUTAN SURAT PERINGATAN",
                 "color": 3066993,
-                "description": `**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Status:** 1 Peringatan telah dicabut.\n**Sisa Total Warning:** ${newWarnCount}`,
+                "description": `**Nama:** ${nama_anggota}\n**Status:** 1 SP Dicabut\n**Sisa SP Sekarang:** ${newWarnCount}`,
                 "timestamp": new Date()
             }]
         };
+
         try {
-            const res = await fetch('/.netlify/functions/send-warning', { method: 'POST', body: JSON.stringify(payload) });
+            await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
+            const newList = await updateDiscordList();
+            const res = await fetch('/.netlify/functions/send-warning', { 
+                method: 'POST', 
+                body: JSON.stringify({ payload: logPayload, updateList: newList }) 
+            });
+
             if (res.ok) {
-                await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
+                alert("✅ BERHASIL: SP telah dicabut & daftar diperbarui!");
                 loadData();
             }
         } catch (e) { alert("Error!"); }
@@ -201,11 +229,7 @@
     // --- EKSPOR RAPI ---
     function downloadExcel() {
         const table = document.getElementById("table-rekap");
-        const dateRange = document.getElementById('label-minggu').innerText;
-        const rows = [];
-        const headers = [];
-        table.querySelectorAll("thead th").forEach((th, idx) => { if(idx < 11) headers.push(th.innerText); });
-        rows.push(headers);
+        const rows = [["Nama Anggota", "Pangkat", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Total", "Gaji", "Status"]];
         table.querySelectorAll("tbody tr").forEach(tr => {
             const rowData = [];
             tr.querySelectorAll("td").forEach((td, idx) => {
@@ -221,7 +245,7 @@
         const ws = XLSX.utils.aoa_to_sheet(rows);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Rekap");
-        XLSX.writeFile(wb, `Rekap_SAPD_${dateRange}.xlsx`);
+        XLSX.writeFile(wb, `Rekap_SAPD.xlsx`);
     }
 
     function downloadPDF() {
@@ -255,6 +279,13 @@
         if (!confirm("Hapus data anggota periode ini?")) return;
         const { mon, sun } = getWeekRange(currentWeekOffset);
         await _supabase.from('absensi_sapd').delete().eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+        loadData();
+    }
+
+    async function resetAllWeeklyData() {
+        if (!confirm("Hapus SEMUA data minggu ini?")) return;
+        const { mon, sun } = getWeekRange(currentWeekOffset);
+        await _supabase.from('absensi_sapd').delete().gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
         loadData();
     }
 
