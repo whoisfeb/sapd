@@ -2,7 +2,7 @@ exports.handler = async (event) => {
   if (event.httpMethod !== "POST") return { statusCode: 405 };
   
   const WEBHOOK_URL = process.env.WARNING_WEBHOOK;
-  const MESSAGE_ID = process.env.warning_message_id; // ID pesan yang akan diedit
+  const MESSAGE_ID = process.env.WARNING_MESSAGE_ID; // ID pesan yang akan diedit
   const body = JSON.parse(event.body);
 
   try {
