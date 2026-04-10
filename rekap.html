@@ -16,17 +16,17 @@
         .card { background: var(--card); padding: 20px; border-radius: 10px; border-top: 4px solid var(--primary); overflow-x: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         table { width: 100%; border-collapse: collapse; font-size: 0.8em; min-width: 1100px; }
         th, td { border: 1px solid #30475e; padding: 12px 8px; text-align: center; }
-        th { background: #0f3460; position: sticky; top: 0; }
-        .btn { padding: 10px 16px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; color: white; transition: 0.2s; font-size: 0.85em; text-decoration: none; }
+        th { background: #0f3460; position: sticky; top: 0; z-index: 10; }
+        .btn { padding: 10px 16px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; color: white; transition: 0.2s; font-size: 0.85em; text-decoration: none; display: inline-block; }
         .btn:hover { opacity: 0.8; transform: translateY(-1px); }
         .btn-back { background: #444; }
         .btn-reset { background: var(--primary); }
         .btn-excel { background: var(--success); }
         .btn-pdf { background: var(--info); }
-        .btn-warning { background: #f39c12; padding: 4px 8px; cursor: pointer; border-radius: 3px; border:none; color:white; }
+        .btn-warning { background: #f39c12; padding: 4px 8px; cursor: pointer; border-radius: 3px; border:none; color:white; font-size: 0.9em; }
         .salary-text { color: #2ecc71; font-weight: bold; }
-        .check-icon { color: #2ecc71; font-weight: bold; }
-        .cross-icon { color: #e94560; opacity: 0.3; }
+        .check-icon { color: #2ecc71; font-weight: bold; font-size: 1.2em; }
+        .cross-icon { color: #e94560; opacity: 0.3; font-size: 1.1em; }
         .nav-btn-small { background: #30475e; color: white; border: none; padding: 8px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
@@ -48,7 +48,7 @@
     <div class="card">
         <div style="display:flex; justify-content:center; align-items:center; gap:30px; margin-bottom:20px;">
             <button class="nav-btn-small" onclick="changeWeek(-1)">◀ Prev</button>
-            <h3 id="label-minggu" style="margin:0; color: #f39c12;">Memuat periode...</h3>
+            <h3 id="label-minggu" style="margin:0; color: #f39c12; min-width: 250px; text-align: center;">Memuat periode...</h3>
             <button class="nav-btn-small" onclick="changeWeek(1)">Next ▶</button>
         </div>
 
@@ -86,6 +86,7 @@
     };
 
     let currentWeekOffset = 0;
+    let userWeekly = {}; // Global variable to store current view data
 
     function getWeekRange(offset = 0) {
         const now = new Date();
@@ -106,7 +107,7 @@
 
         masters.sort((a, b) => (RANK_ORDER[a.pangkat.toUpperCase()] || 99) - (RANK_ORDER[b.pangkat.toUpperCase()] || 99));
 
-        const userWeekly = {};
+        userWeekly = {}; 
         masters.forEach(m => {
             userWeekly[m.discord_id] = { info: m, days: { 1:null, 2:null, 3:null, 4:null, 5:null, 6:null }, totalHadir: 0 };
         });
@@ -125,7 +126,9 @@
             let totalGaji = (gajiPokok / 5) * Math.min(u.totalHadir, 5);
             if (u.totalHadir >= 6) totalGaji += 10000;
 
-            const warn = (u.totalHadir < 3) ? `<button class="btn-warning" onclick="sendWarning('${u.info.nama_anggota}')">⚠️ Warning</button>` : `<span style="color:gray">Aktif</span>`;
+            const warnBtn = (u.totalHadir < 3) 
+                ? `<button class="btn-warning" onclick="sendWarning('${m.discord_id}', '${m.nama_anggota}')">⚠️ Warning</button>` 
+                : `<span style="color:gray">Aktif</span>`;
             const icon = (idx) => u.days[idx] ? `<span class="check-icon">✔</span>` : `<span class="cross-icon">✘</span>`;
 
             return `<tr>
@@ -134,104 +137,113 @@
                 <td>${icon(1)}</td><td>${icon(2)}</td><td>${icon(3)}</td><td>${icon(4)}</td><td>${icon(5)}</td><td>${icon(6)}</td>
                 <td>${u.totalHadir}/6</td>
                 <td class="salary-text">$${Math.floor(totalGaji).toLocaleString()}</td>
-                <td>${warn}</td>
-                <td><button onclick="resetUser('${u.info.discord_id}')" style="background:none;border:none;cursor:pointer;">🗑</button></td>
+                <td>${warnBtn}</td>
+                <td><button onclick="resetUser('${u.info.discord_id}')" style="background:none;border:none;cursor:pointer;font-size:1.2em;">🗑</button></td>
             </tr>`;
         }).join('');
     }
 
-    // --- EKSPOR EXCEL YANG RAPI ---
-function downloadExcel() {
-    const table = document.getElementById("table-rekap");
-    const dateRange = document.getElementById('label-minggu').innerText;
-    
-    // Buat data array untuk Excel agar benar-benar bersih dari HTML
-    const rows = [];
-    const headers = [];
-    
-    // Ambil Header (Hapus kolom terakhir/Aksi)
-    const headerCells = table.querySelectorAll("thead th");
-    for (let i = 0; i < headerCells.length - 1; i++) {
-        headers.push(headerCells[i].innerText);
-    }
-    rows.push(headers);
+    // --- FITUR WARNING SECURE (Via Netlify Function) ---
+    async function sendWarning(discord_id, nama_anggota) {
+        const { mon } = getWeekRange(currentWeekOffset);
+        const u = userWeekly[discord_id];
+        if (!u) return alert("Data tidak ditemukan.");
 
-    // Ambil Data Baris
-    const bodyRows = table.querySelectorAll("tbody tr");
-    bodyRows.forEach(row => {
-        const rowData = [];
-        const cells = row.querySelectorAll("td");
+        const daftarBolos = [];
+        const namaHari = ["", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
         
-        for (let i = 0; i < cells.length - 1; i++) {
-            let cellText = cells[i].innerText.trim();
-            
-            // Konversi simbol agar rapi di Excel
-            if (cells[i].querySelector('.check-icon')) cellText = "V";
-            if (cells[i].querySelector('.cross-icon')) cellText = "-";
-            if (cellText.includes("Warning")) cellText = "WARN";
-            
-            rowData.push(cellText);
-        }
-        rows.push(rowData);
-    });
-
-    // Buat Workbook
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Rekap Gaji");
-    
-    // Atur Lebar Kolom agar otomatis rapi
-    ws['!cols'] = [{wch:25}, {wch:20}, {wch:5}, {wch:5}, {wch:5}, {wch:5}, {wch:5}, {wch:5}, {wch:10}, {wch:15}, {wch:10}];
-
-    XLSX.writeFile(wb, `Rekap_SAPD_${dateRange.replace(/ /g, '_')}.xlsx`);
-}
-
-// --- EKSPOR PDF YANG RAPI (Anti-Error) ---
-function downloadPDF() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('l', 'mm', 'a4');
-    const dateRange = document.getElementById('label-minggu').innerText;
-
-    doc.setFontSize(16);
-    doc.text("REKAPITULASI GAJI & ABSENSI SAPD", 14, 15);
-    doc.setFontSize(10);
-    doc.text(`Periode: ${dateRange}`, 14, 22);
-
-    doc.autoTable({
-        html: '#table-rekap',
-        startY: 30,
-        theme: 'grid',
-        headStyles: { fillColor: [233, 69, 96], halign: 'center' },
-        styles: { fontSize: 8, cellPadding: 2 },
-        // Kolom yang akan diambil (0 sampai 10, kolom 11/Aksi dibuang)
-        columns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-        didParseCell: function(data) {
-            // Cek apakah sel memiliki konten teks untuk menghindari error .includes()
-            let content = data.cell.raw ? data.cell.raw.innerText || "" : "";
-            
-            if (data.cell.section === 'body') {
-                // Bersihkan tampilan centang/silang
-                if (data.cell.raw.querySelector('.check-icon')) {
-                    data.cell.text = ['V'];
-                } else if (data.cell.raw.querySelector('.cross-icon')) {
-                    data.cell.text = ['-'];
-                }
-                
-                // Bersihkan tampilan Warning
-                if (content.includes("Warning")) {
-                    data.cell.text = ['WARN'];
-                }
-                
-                // Alignment Gaji ke kanan
-                if (data.column.index === 9) {
-                    data.cell.styles.halign = 'right';
-                }
+        for (let i = 1; i <= 6; i++) {
+            if (!u.days[i]) {
+                const tgl = new Date(mon);
+                tgl.setDate(mon.getDate() + (i - 1));
+                const formatTgl = tgl.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+                daftarBolos.push(`- ${namaHari[i]}, ${formatTgl}`);
             }
         }
-    });
 
-    doc.save(`Rekap_SAPD_${dateRange.replace(/ /g, '_')}.pdf`);
-}
+        const payload = {
+            "content": "@everyone <@&1444908462067945623>",
+            "embeds": [{
+                "title": "📋 SURAT PERINGATAN (SP)",
+                "color": 15285324,
+                "description": `**Tanggal:** ${new Date().toLocaleDateString('id-ID', {day:'2-digit', month:'long', year:'numeric'})}\n**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat:** ${u.info.pangkat}\n**Total Warning:** 1 (Satu)\n\n**Alasan Peringatan:**\nTidak mengisi kehadiran selama **${daftarBolos.length} hari** minggu ini:\n${daftarBolos.join('\n')}\n\n**Pemberi Peringatan:** Admin System\n**Pangkat:** Internal Affairs`,
+                "footer": { "text": "SAPD Administrative Portal" },
+                "timestamp": new Date()
+            }]
+        };
+
+        try {
+            const response = await fetch('/.netlify/functions/send-warning', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            if (response.ok) alert(`✅ SP Berhasil dikirim ke Discord untuk ${nama_anggota}`);
+            else alert("❌ Gagal mengirim. Cek konfigurasi Environment Variable Netlify.");
+        } catch (e) { alert("❌ Error sistem saat mengirim warning."); }
+    }
+
+    // --- EKSPOR EXCEL RAPI ---
+    function downloadExcel() {
+        const table = document.getElementById("table-rekap");
+        const dateRange = document.getElementById('label-minggu').innerText;
+        const rows = [];
+        
+        const headers = [];
+        table.querySelectorAll("thead th").forEach((th, idx) => { if(idx < 11) headers.push(th.innerText); });
+        rows.push(headers);
+
+        table.querySelectorAll("tbody tr").forEach(tr => {
+            const rowData = [];
+            tr.querySelectorAll("td").forEach((td, idx) => {
+                if (idx < 11) {
+                    let text = td.innerText.trim();
+                    if (td.querySelector('.check-icon')) text = "V";
+                    if (td.querySelector('.cross-icon')) text = "-";
+                    if (text.includes("Warning")) text = "WARN";
+                    rowData.push(text);
+                }
+            });
+            rows.push(rowData);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Rekap_Gaji");
+        ws['!cols'] = [{wch:25}, {wch:20}, {wch:5}, {wch:5}, {wch:5}, {wch:5}, {wch:5}, {wch:5}, {wch:10}, {wch:15}, {wch:10}];
+        XLSX.writeFile(wb, `Rekap_SAPD_${dateRange.replace(/ /g, '_')}.xlsx`);
+    }
+
+    // --- EKSPOR PDF RAPI ---
+    function downloadPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'mm', 'a4');
+        const dateRange = document.getElementById('label-minggu').innerText;
+
+        doc.setFontSize(16);
+        doc.text("REKAPITULASI GAJI & ABSENSI SAPD", 14, 15);
+        doc.setFontSize(10);
+        doc.text(`Periode: ${dateRange}`, 14, 22);
+
+        doc.autoTable({
+            html: '#table-rekap',
+            startY: 30,
+            theme: 'grid',
+            headStyles: { fillColor: [233, 69, 96], halign: 'center' },
+            styles: { fontSize: 8, cellPadding: 2 },
+            columns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            didParseCell: function(data) {
+                if (data.cell.section === 'body') {
+                    let raw = data.cell.raw;
+                    if (raw.querySelector && raw.querySelector('.check-icon')) data.cell.text = ['V'];
+                    else if (raw.querySelector && raw.querySelector('.cross-icon')) data.cell.text = ['-'];
+                    
+                    if (data.cell.text[0].includes("Warning")) data.cell.text = ['WARN'];
+                    if (data.column.index === 9) data.cell.styles.halign = 'right';
+                }
+            }
+        });
+        doc.save(`Rekap_SAPD_${dateRange.replace(/ /g, '_')}.pdf`);
+    }
 
     async function resetAllWeeklyData() {
         if (!confirm("Hapus semua data & foto minggu ini?")) return;
@@ -244,13 +256,12 @@ function downloadPDF() {
     }
 
     async function resetUser(id) {
-        if (!confirm("Hapus data anggota ini?")) return;
+        if (!confirm("Hapus data anggota ini di periode ini?")) return;
         const { mon, sun } = getWeekRange(currentWeekOffset);
         await _supabase.from('absensi_sapd').delete().eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
         loadData();
     }
 
-    function sendWarning(nama) { alert(`Warning SP-1 untuk ${nama} diproses.`); }
     function changeWeek(dir) { currentWeekOffset += dir; loadData(); }
     loadData();
 </script>
