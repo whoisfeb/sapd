@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>SAPD - Admin High Command</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --primary: #e94560; --bg: #1a1a2e; --card: #16213e; }
+        body { font-family: sans-serif; background: var(--bg); color: white; padding: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .card { background: var(--card); padding: 20px; border-radius: 10px; border-top: 4px solid var(--primary); }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85em; }
+        th, td { border: 1px solid #30475e; padding: 10px; text-align: left; }
+        th { background: #0f3460; }
+        .btn { padding: 8px 15px; cursor: pointer; background: var(--primary); border: none; color: white; border-radius: 5px; margin-bottom: 10px; }
+        .badge { padding: 3px 6px; border-radius: 4px; font-size: 0.75em; }
+        .status-hadir { background: #28a745; }
+        .status-bolos { background: #dc3545; }
+        .tab-menu { margin-bottom: 20px; border-bottom: 2px solid #30475e; padding-bottom: 10px; }
+        .tab-btn { background: none; border: none; color: gray; cursor: pointer; font-size: 1.1em; margin-right: 20px; }
+        .tab-btn.active { color: var(--primary); font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h2>SAPD ADMINISTRATIVE PANEL</h2>
+    
+    <div class="tab-menu">
+        <button class="tab-btn active" onclick="showTab('tab-kehadiran')">Rekap Kehadiran</button>
+        <button class="tab-btn" onclick="showTab('tab-gaji')">Rekap Gaji</button>
+        <button class="tab-btn" onclick="showTab('tab-monitoring')">Monitoring Role Inti</button>
+    </div>
+
+    <div id="tab-kehadiran" class="tab-content">
+        <div class="card">
+            <h3>Log Absensi Terbaru</h3>
+            <table id="table-absen">
+                <thead>
+                    <tr><th>Waktu</th><th>Nama</th><th>Pangkat</th><th>Status</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="tab-gaji" class="tab-content" style="display:none;">
+        <div class="card">
+            <h3>Estimasi Gaji Mingguan</h3>
+            <p style="font-size: 0.8em; color: #aaa;">Rumus: Hadir x $5.000</p>
+            <table id="table-gaji">
+                <thead>
+                    <tr><th>Nama Anggota</th><th>Total Hadir</th><th>Total Gaji</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="tab-monitoring" class="tab-content" style="display:none;">
+        <div class="card">
+            <h3>Anggota Belum Absen Hari Ini</h3>
+            <p style="color: #e94560; font-size: 0.8em;">*Hanya menampilkan user yang memiliki data di database tapi belum input hari ini.</p>
+            <table id="table-monitoring">
+                <thead>
+                    <tr><th>Nama Anggota</th><th>Pangkat</th><th>Status</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+<script>
+    const SUPABASE_URL = "https://urclmvdkfkfwvdascobs.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4";
+    const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // --- HARGA GAJI PER KEHADIRAN ---
+    const GAJI_PER_HADIR = 5000;
+
+    async function loadData() {
+        // 1. Ambil Data Kehadiran
+        const { data: logs, error } = await _supabase.from('absensi_sapd').select('*').order('created_at', { ascending: false });
+        if (error) return;
+
+        // Render Tab Kehadiran
+        const tbodyAbsen = document.querySelector('#table-absen tbody');
+        tbodyAbsen.innerHTML = logs.map(row => `
+            <tr>
+                <td>${new Date(row.created_at).toLocaleDateString()}</td>
+                <td>${row.nama_anggota}</td>
+                <td>${row.pangkat}</td>
+                <td><span class="badge status-hadir">${row.tipe_absen}</span></td>
+            </tr>
+        `).join('');
+
+        // 2. Hitung Gaji
+        const gajiMap = {};
+        logs.forEach(row => {
+            if(row.tipe_absen === 'Hadir') {
+                gajiMap[row.nama_anggota] = (gajiMap[row.nama_anggota] || 0) + 1;
+            }
+        });
+
+        const tbodyGaji = document.querySelector('#table-gaji tbody');
+        tbodyGaji.innerHTML = Object.keys(gajiMap).map(nama => `
+            <tr>
+                <td>${nama}</td>
+                <td>${gajiMap[nama]}x</td>
+                <td>$${(gajiMap[nama] * GAJI_PER_HADIR).toLocaleString()}</td>
+            </tr>
+        `).join('');
+
+        // 3. Monitoring Bolos (Logika Sederhana: Siapa yang pernah absen tapi hari ini belum)
+        const hariIni = new Date().toLocaleDateString();
+        const sudahAbsenHariIni = logs.filter(l => new Date(l.created_at).toLocaleDateString() === hariIni).map(l => l.nama_anggota);
+        const semuaAnggota = [...new Set(logs.map(l => l.nama_anggota))]; // List unik semua anggota di DB
+        
+        const bolos = semuaAnggota.filter(nama => !sudahAbsenHariIni.includes(nama));
+        const tbodyMonitoring = document.querySelector('#table-monitoring tbody');
+        tbodyMonitoring.innerHTML = bolos.map(nama => `
+            <tr>
+                <td>${nama}</td>
+                <td>-</td>
+                <td><span class="badge status-bolos">BELUM ABSEN HARI INI</span></td>
+            </tr>
+        `).join('');
+    }
+
+    function showTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).style.display = 'block';
+        event.target.classList.add('active');
+    }
+
+    loadData();
+</script>
+</body>
+</html>
