@@ -140,12 +140,10 @@
         }).join('');
     }
 
-    // Fungsi Update Daftar di Discord (Urut Berdasarkan Pangkat & Tagging)
+    // Fungsi Update Daftar di Discord (Urutan & Tagging Aman)
     async function updateDiscordList() {
-        // Ambil data termasuk discord_id untuk tagging
         const { data: masters } = await _supabase.from('users_master').select('nama_anggota, pangkat, total_warning, discord_id');
         
-        // Urutkan berdasarkan pangkat tertinggi (RANK_ORDER)
         masters.sort((a, b) => {
             const rankA = RANK_ORDER[a.pangkat.toUpperCase()] || 99;
             const rankB = RANK_ORDER[b.pangkat.toUpperCase()] || 99;
@@ -158,16 +156,20 @@
         masters.forEach(m => {
             const w = m.total_warning || 0;
             const emoji = w >= 3 ? "🔴" : (w > 0 ? "🟡" : "🟢");
-            // Format: [Emoji] PANGKAT | Nama (Tag Discord) : SP
-            listText += `${emoji} **${m.pangkat}** | ${m.nama_anggota} (<@${m.discord_id}>) : \`${w} SP\`\n`;
+            
+            // Proteksi jika discord_id tidak ada agar tidak Error 400
+            const tag = (m.discord_id && !isNaN(m.discord_id)) ? `<@${m.discord_id}>` : `*No ID*`;
+            
+            listText += `${emoji} **${m.pangkat}** | ${m.nama_anggota} (${tag}) : \`${w} SP\`\n`;
         });
 
         listText += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
         listText += `*Terakhir diperbarui: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB*`;
-        return listText;
+        
+        // Memastikan tidak lebih dari 2000 karakter (limit Discord)
+        return listText.substring(0, 1990);
     }
 
-    // ACTION: TAMBAH WARNING
     async function sendWarning(discord_id, nama_anggota, currentWarn) {
         if (!confirm(`Kirim SP-${currentWarn + 1} ke Discord?`)) return;
         const { mon } = getWeekRange(currentWeekOffset);
@@ -203,13 +205,12 @@
             });
 
             if (res.ok) {
-                alert(`✅ BERHASIL: SP-${newWarnCount} terkirim & daftar diperbarui!`);
+                alert(`✅ BERHASIL: SP-${newWarnCount} terkirim!`);
                 loadData();
             }
         } catch (e) { alert("Error!"); }
     }
 
-    // ACTION: CABUT WARNING
     async function removeWarning(discord_id, nama_anggota, currentWarn) {
         if (!confirm(`Cabut SP untuk ${nama_anggota}?`)) return;
         const newWarnCount = Math.max(0, currentWarn - 1);
@@ -218,7 +219,7 @@
             "embeds": [{
                 "title": "🔓 PENCABUTAN SURAT PERINGATAN",
                 "color": 3066993,
-                "description": `**Nama:** ${nama_anggota} (<@${discord_id}>)\n**Status:** 1 SP Dicabut\n**Sisa SP Sekarang:** ${newWarnCount}`,
+                "description": `**Nama:** ${nama_anggota} (<@${discord_id}>)\n**Status:** 1 SP Dicabut\n**Sisa SP:** ${newWarnCount}`,
                 "timestamp": new Date()
             }]
         };
@@ -226,19 +227,15 @@
         try {
             await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
             const newList = await updateDiscordList();
-            const res = await fetch('/.netlify/functions/send-warning', { 
+            await fetch('/.netlify/functions/send-warning', { 
                 method: 'POST', 
                 body: JSON.stringify({ payload: logPayload, updateList: newList }) 
             });
-
-            if (res.ok) {
-                alert("✅ BERHASIL: SP telah dicabut & daftar diperbarui!");
-                loadData();
-            }
+            alert("✅ BERHASIL: SP dicabut!");
+            loadData();
         } catch (e) { alert("Error!"); }
     }
 
-    // --- EKSPOR RAPI ---
     function downloadExcel() {
         const table = document.getElementById("table-rekap");
         const rows = [["Nama Anggota", "Pangkat", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Total", "Gaji", "Status"]];
@@ -270,7 +267,6 @@
                 if (data.cell.section === 'body') {
                     if (data.cell.raw.querySelector && data.cell.raw.querySelector('.check-icon')) data.cell.text = ['V'];
                     else if (data.cell.raw.querySelector && data.cell.raw.querySelector('.cross-icon')) data.cell.text = ['-'];
-                    if (data.cell.text[0].includes("Warning")) data.cell.text = [data.cell.text[0].split('Warning')[1].trim()];
                 }
             }
         });
