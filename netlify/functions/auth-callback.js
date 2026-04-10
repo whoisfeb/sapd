@@ -68,7 +68,6 @@ exports.handler = async (event) => {
             "1444921352120434819": "INTERNAL AFFAIRS DIVISION"
         };
 
-        // --- ROLE ADMIN / PETINGGI ---
         const ADMIN_ROLE_ID = "1444910578266148897"; 
 
         let userPangkat = "Unknown";
@@ -78,10 +77,25 @@ exports.handler = async (event) => {
         roles.forEach(r => {
             if (PANGKAT_MAP[r]) userPangkat = PANGKAT_MAP[r];
             if (DIVISI_MAP[r]) userDivisi.push(DIVISI_MAP[r]);
-            if (r === ADMIN_ROLE_ID) isAdmin = true; // Cek jika user High Command
+            if (r === ADMIN_ROLE_ID) isAdmin = true;
         });
 
-        // 4. Redirect ke Dashboard dengan tambahan status Admin
+        // --- LOGIKA BARU: UPDATE BUKU INDUK ANGGOTA ---
+        // Ini akan menyimpan data user ke tabel users_master agar sistem monitoring rekap 
+        // tahu siapa saja anggota yang aktif
+        try {
+            await supabase.from('users_master').upsert({
+                discord_id: userId,
+                nama_anggota: displayName,
+                pangkat: userPangkat,
+                last_login: new Date().toISOString()
+            }, { onConflict: 'discord_id' }); // Update jika discord_id sudah ada
+        } catch (dbErr) {
+            console.error("Gagal update Buku Induk:", dbErr);
+            // Tetap lanjut redirect meskipun gagal update master agar user tidak stuck
+        }
+
+        // 4. Redirect ke Dashboard
         const redirectUrl = `/dashboard.html?id=${userId}&name=${encodeURIComponent(displayName)}&pangkat=${encodeURIComponent(userPangkat)}&divisi=${encodeURIComponent(JSON.stringify(userDivisi))}&admin=${isAdmin}`;
         
         return {
