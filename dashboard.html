@@ -3,206 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SAPD - Portal Absensi & Kehadiran</title>
+    <title>SAPD Dashboard - Absensi</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root {
-            --primary: #e94560;
-            --secondary: #0f3460;
-            --bg: #1a1a2e;
-            --card: #16213e;
-            --text: #ffffff;
-        }
-
-        body {
-            font-family: 'Segoe UI', Roboto, sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            margin: 0;
-            display: flex;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .container {
-            width: 100%;
-            max-width: 500px;
-        }
-
-        .card {
-            background: var(--card);
-            padding: 25px;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            border-top: 6px solid var(--primary);
-        }
-
-        .profile-box {
-            background: var(--secondary);
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-
-        .profile-box h2 { margin: 0; font-size: 1.4em; color: var(--primary); }
-        .profile-box p { margin: 5px 0 0; font-size: 0.9em; opacity: 0.8; }
-
-        label { display: block; margin-top: 15px; font-weight: bold; font-size: 0.9em; }
-
-        select, textarea, button {
-            width: 100%;
-            padding: 12px;
-            margin-top: 8px;
-            border-radius: 6px;
-            border: 1px solid #30475e;
-            background: #1a1a2e;
-            color: white;
-            box-sizing: border-box;
-            font-size: 1em;
-        }
-
-        textarea { height: 100px; resize: none; }
-
-        button {
-            background: var(--primary);
-            border: none;
-            font-weight: bold;
-            margin-top: 25px;
-            cursor: pointer;
-            transition: 0.3s;
-            text-transform: uppercase;
-        }
-
-        button:hover { background: #ff2e63; transform: translateY(-2px); }
-
-        .admin-panel {
-            margin-top: 20px;
-            padding: 15px;
-            border: 1px dashed var(--primary);
-            border-radius: 8px;
-            display: none; 
-            text-align: center;
-        }
-
-        .status-msg {
-            margin-top: 15px;
-            text-align: center;
-            font-weight: bold;
-        }
+        :root { --primary: #e94560; --bg: #1a1a2e; --card: #16213e; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .container { background: var(--card); padding: 30px; border-radius: 15px; width: 90%; max-width: 400px; text-align: center; border-top: 5px solid var(--primary); }
+        .user-info { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #30475e; }
+        input[type="file"] { margin: 15px 0; font-size: 0.8em; }
+        .btn-absen { background: var(--primary); color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; }
+        .btn-absen:disabled { background: #555; cursor: not-allowed; }
+        .holiday-msg { color: var(--primary); font-weight: bold; font-size: 1.5em; display: none; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="card">
-        <div class="profile-box">
-            <h2 id="disp-name">Loading...</h2>
-            <p id="disp-pangkat">Rank: -</p>
-            <p id="disp-divisi" style="font-style: italic; font-size: 0.8em;">Division: -</p>
-        </div>
+    <div class="user-info">
+        <h3 id="user-name">Memuat...</h3>
+        <p id="user-pangkat" style="color: #aaa;"></p>
+    </div>
 
-        <form id="absenForm">
-            <label>Jenis Kehadiran</label>
-            <select id="tipe_absen" required onchange="toggleAlasan()">
-                <option value="Hadir">Hadir (On Duty)</option>
-                <option value="Izin">Izin (Sakit/Keperluan)</option>
-                <option value="Cuti">Cuti (Long Term)</option>
-            </select>
+    <div id="absensi-section">
+        <p>Silakan upload bukti foto kegiatan (SS SAMP):</p>
+        <input type="file" id="bukti-foto" accept="image/*">
+        <button id="btn-submit" class="btn-absen" onclick="kirimAbsen()">Kirim Absensi</button>
+    </div>
 
-            <div id="box-alasan" style="display: none;">
-                <label>Alasan / Keterangan</label>
-                <textarea id="alasan" placeholder="Tulis alasan Anda di sini..."></textarea>
-            </div>
-
-            <button type="submit" id="btnSubmit">Kirim Laporan</button>
-        </form>
-
-        <div id="statusMsg" class="status-msg"></div>
-
-        <div id="adminPanel" class="admin-panel">
-            <p style="color: var(--primary); font-weight: bold; margin: 0;">HIGH COMMAND ACCESS</p>
-            <button onclick="lihatRekap()" style="background: #30475e; font-size: 0.8em; margin-top: 10px;">Lihat Rekap Seluruh Anggota</button>
-        </div>
+    <div id="holiday-section" class="holiday-msg">
+        LIBUR WOI!<br>
+        <span style="font-size: 0.5em; color: gray;">Hari Minggu waktunya istirahat.</span>
     </div>
 </div>
 
 <script>
-    // 1. Ambil Parameter
     const params = new URLSearchParams(window.location.search);
     const userId = params.get('id');
     const userName = params.get('name');
     const userPangkat = params.get('pangkat');
-    const userDivisi = JSON.parse(params.get('divisi') || "[]");
-    const isAdmin = params.get('admin') === 'true';
 
-    // 2. Update UI
-    document.getElementById('disp-name').innerText = userName || "Guest";
-    document.getElementById('disp-pangkat').innerText = "Rank: " + (userPangkat || "Unassigned");
-    document.getElementById('disp-divisi').innerText = "Div: " + (userDivisi.length > 0 ? userDivisi.join(", ") : "General Duty");
-
-    if (isAdmin) {
-        document.getElementById('adminPanel').style.display = 'block';
-    }
-
-    // 3. Inisialisasi Supabase (PERBAIKAN: Menggunakan window.supabase)
     const SUPABASE_URL = "https://urclmvdkfkfwvdascobs.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4";
-    
-    // Pastikan library dimuat dulu baru panggil createClient
+    const SUPABASE_KEY = "ISI_ANON_KEY_KAMU"; 
     const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    function toggleAlasan() {
-        const tipe = document.getElementById('tipe_absen').value;
-        document.getElementById('box-alasan').style.display = (tipe === 'Hadir') ? 'none' : 'block';
+    document.getElementById('user-name').innerText = userName || "User";
+    document.getElementById('user-pangkat').innerText = userPangkat || "-";
+
+    // Cek Hari Minggu
+    const hariIni = new Date().getDay(); 
+    if (hariIni === 0) {
+        document.getElementById('absensi-section').style.display = 'none';
+        document.getElementById('holiday-section').style.display = 'block';
     }
 
-    // 4. Proses Submit
-    document.getElementById('absenForm').onsubmit = async (e) => {
-        e.preventDefault();
-        const btn = document.getElementById('btnSubmit');
-        const msg = document.getElementById('statusMsg');
+    async function kirimAbsen() {
+        const fileInput = document.getElementById('bukti-foto');
+        const btn = document.getElementById('btn-submit');
 
-        const tipe = document.getElementById('tipe_absen').value;
-        const ket = document.getElementById('alasan').value;
-
-        if ((tipe === 'Izin' || tipe === 'Cuti') && !ket) {
-            alert("Harap isi alasan jika Izin atau Cuti!");
-            return;
-        }
+        if (!fileInput.files[0]) return alert("Mana bukti fotonya? Jangan mau gaji buta!");
 
         btn.disabled = true;
-        btn.innerText = "MENGIRIM...";
+        btn.innerText = "Mengirim...";
 
         try {
-            const { error } = await _supabase.from('absensi_sapd').insert([{
+            const file = fileInput.files[0];
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Date.now()}_${userId}.${fileExt}`;
+
+            // 1. Upload ke Storage Bucket "bukti-absen"
+            const { data: uploadData, error: uploadErr } = await _supabase.storage
+                .from('bukti-absen')
+                .upload(fileName, file);
+
+            if (uploadErr) throw uploadErr;
+
+            const publicUrl = _supabase.storage.from('bukti-absen').getPublicUrl(fileName).data.publicUrl;
+
+            // 2. Insert ke Database
+            const { error: dbErr } = await _supabase.from('absensi_sapd').insert({
                 discord_id: userId,
                 nama_anggota: userName,
                 pangkat: userPangkat,
-                divisi: userDivisi,
-                tipe_absen: tipe,
-                alasan: ket
-            }]);
+                tipe_absen: 'Hadir',
+                bukti_foto: publicUrl
+            });
 
-            if (error) throw error;
+            if (dbErr) throw dbErr;
 
-            msg.style.color = "#00ff00";
-            msg.innerText = "Laporan berhasil dikirim!";
-            btn.style.display = "none";
-            document.getElementById('absenForm').reset();
+            alert("Absensi berhasil dikirim!");
+            fileInput.value = "";
         } catch (err) {
-            msg.style.color = "red";
-            msg.innerText = "Error: " + err.message;
+            alert("Error: " + err.message);
+        } finally {
             btn.disabled = false;
-            btn.innerText = "COBA LAGI";
+            btn.innerText = "Kirim Absensi";
         }
-    };
-
-    // 5. Link ke Rekap (PERBAIKAN: Membawa data admin)
-    function lihatRekap() {
-        window.location.href = 'rekap.html' + window.location.search;
     }
 </script>
-
 </body>
 </html>
