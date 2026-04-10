@@ -12,33 +12,33 @@
         h2, h4 { text-align: center; margin-bottom: 5px; }
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-size: 0.85em; color: #aaa; }
-        input, textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #30475e; background: #1a1a2e; color: white; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--primary); color: white; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+        input, textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #30475e; background: #1a1a2e; color: white; box-sizing: border-box; font-size: 14px; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--primary); color: white; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; font-size: 16px; }
         button:disabled { background: #555; cursor: not-allowed; opacity: 0.7; }
-        #status-msg { text-align: center; margin-top: 15px; font-size: 0.9em; font-weight: bold; }
-        .loading-overlay { text-align: center; padding: 20px; }
+        #status-msg { text-align: center; margin-top: 15px; font-size: 0.9em; font-weight: bold; min-height: 1.2em; }
+        .loading-screen { text-align: center; padding: 20px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div id="loading-screen" class="loading-overlay">
+    <div id="loading-screen" class="loading-screen">
         <h3>Memverifikasi Akses...</h3>
-        <p style="font-size: 0.8em; color: #888;">Mengecek kredensial Role Inti...</p>
+        <p style="font-size: 0.8em; color: #888;">Mohon tunggu sebentar.</p>
     </div>
 
     <div id="main-content" style="display: none;">
         <h2 id="display-name">Username</h2>
-        <h4 id="display-info" style="color: #888; font-weight: normal; margin-bottom: 20px;">Pangkat | Divisi</h4>
+        <h4 id="display-info" style="color: #888; font-weight: normal; margin-bottom: 25px;">Pangkat | Divisi</h4>
 
         <form id="absensi-form">
             <div class="form-group">
                 <label>Jam Duty (Contoh: 19:00 - 21:00)</label>
-                <input type="text" id="jam_duty" placeholder="Jam mulai s/d selesai" required>
+                <input type="text" id="jam_duty" placeholder="Masukkan jam mulai s/d selesai" required>
             </div>
             <div class="form-group">
                 <label>Kegiatan</label>
-                <textarea id="kegiatan" rows="3" placeholder="Patroli, Response Code 3, dll." required></textarea>
+                <textarea id="kegiatan" rows="3" placeholder="Apa saja yang dilakukan saat duty?" required></textarea>
             </div>
             <div class="form-group">
                 <label>Bukti Foto (SS SAMP)</label>
@@ -51,90 +51,105 @@
 </div>
 
 <script>
+    // KONFIGURASI SUPABASE
     const SUPABASE_URL = "https://urclmvdkfkfwvdascobs.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4"; 
     const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     const urlParams = new URLSearchParams(window.location.search);
     const discordId = urlParams.get('id');
 
-    // 1. GATEKEEPER KEAMANAN
+    // 1. VERIFIKASI AKSES (Dijalankan saat halaman dibuka)
     async function verifyAccess() {
         if (!discordId) {
             window.location.href = "index.html";
             return;
         }
 
-        // Cek apakah ID ada di users_master
         const { data: user, error } = await _supabase
             .from('users_master')
             .select('*')
             .eq('discord_id', discordId)
             .single();
 
-        // JIKA TIDAK ADA DI DATABASE: Langsung Blokir
         if (error || !user) {
-            alert("AKSES DITOLAK: Anda tidak memiliki Role Inti atau data belum disinkronkan oleh Admin.");
+            alert("AKSES DITOLAK: Anda tidak memiliki Role Inti atau akses Anda telah dicabut.");
             window.location.href = "index.html";
             return;
         }
 
-        // JIKA ADA DI DATABASE: Izinkan Masuk
+        // Tampilkan konten jika lolos verifikasi
         document.getElementById('loading-screen').style.display = 'none';
         document.getElementById('main-content').style.display = 'block';
         document.getElementById('display-name').innerText = user.nama_anggota;
         document.getElementById('display-info').innerText = `${user.pangkat} | ${user.divisi}`;
     }
 
-    // 2. LOGIKA KIRIM ABSENSI
+    // 2. LOGIKA KIRIM ABSENSI + VALIDASI MENIT TERAKHIR
     document.getElementById('absensi-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = document.getElementById('btn-kirim');
         const msg = document.getElementById('status-msg');
         
+        // --- SECURITY CHECK SAAT SUBMIT ---
+        // Mengecek apakah saat tombol ditekan, user masih punya role (ada di database)
+        const { data: activeUser, error: activeError } = await _supabase
+            .from('users_master')
+            .select('discord_id')
+            .eq('discord_id', discordId)
+            .single();
+
+        if (activeError || !activeUser) {
+            alert("SESI BERAKHIR: Akses Anda baru saja dicabut. Anda tidak dapat mengirim absensi.");
+            window.location.href = "index.html";
+            return;
+        }
+        // ----------------------------------
+
         btn.disabled = true;
-        btn.innerText = "Mengupload Bukti...";
+        btn.innerText = "Mengunggah Bukti...";
+        msg.innerText = "";
 
         const file = document.getElementById('bukti_foto').files[0];
         const fileName = `absensi/${Date.now()}_${discordId}.png`;
 
-        // Upload ke Storage
-        const { data: storageData, error: storageError } = await _supabase.storage
-            .from('absensi-bukti')
-            .upload(fileName, file);
+        try {
+            // Upload ke Supabase Storage
+            const { data: storageData, error: storageError } = await _supabase.storage
+                .from('absensi-bukti')
+                .upload(fileName, file);
 
-        if (storageError) {
-            msg.innerText = "Gagal upload SS: " + storageError.message;
-            msg.style.color = "#e94560";
-            btn.disabled = false;
-            return;
-        }
+            if (storageError) throw storageError;
 
-        const { data: publicUrl } = _supabase.storage.from('absensi-bukti').getPublicUrl(fileName);
+            const { data: publicUrl } = _supabase.storage.from('bukti-absen').getPublicUrl(fileName);
 
-        // Masukkan ke Logs Kehadiran
-        const { error: insertError } = await _supabase.from('absensi_sapd').insert([{
-            discord_id: discordId,
-            nama_anggota: document.getElementById('display-name').innerText,
-            pangkat: document.getElementById('display-info').innerText.split(' | ')[0],
-            jam_duty: document.getElementById('jam_duty').value,
-            kegiatan: document.getElementById('kegiatan').value,
-            bukti_foto: publicUrl.publicUrl
-        }]);
+            // Simpan ke Tabel Logs (absensi_sapd)
+            const { error: insertError } = await _supabase.from('absensi_sapd').insert([{
+                discord_id: discordId,
+                nama_anggota: document.getElementById('display-name').innerText,
+                pangkat: document.getElementById('display-info').innerText.split(' | ')[0],
+                jam_duty: document.getElementById('jam_duty').value,
+                kegiatan: document.getElementById('kegiatan').value,
+                bukti_foto: publicUrl.publicUrl
+            }]);
 
-        if (insertError) {
-            msg.innerText = "Gagal simpan data: " + insertError.message;
-            msg.style.color = "#e94560";
-        } else {
-            msg.innerText = "Absensi Berhasil Terkirim!";
+            if (insertError) throw insertError;
+
+            msg.innerText = "✔ Berhasil! Absensi telah tercatat.";
             msg.style.color = "#2ecc71";
             document.getElementById('absensi-form').reset();
+
+        } catch (err) {
+            console.error(err);
+            msg.innerText = "Gagal: " + err.message;
+            msg.style.color = "#e94560";
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "Kirim Absensi";
         }
-        
-        btn.disabled = false;
-        btn.innerText = "Kirim Absensi";
     });
 
+    // Jalankan verifikasi awal
     verifyAccess();
 </script>
 
