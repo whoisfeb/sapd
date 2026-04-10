@@ -6,24 +6,43 @@
     <title>SAPD Dashboard - Panel Anggota</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #e94560; --bg: #1a1a2e; --card: #16213e; --text: #ffffff; }
+        :root { --primary: #e94560; --bg: #1a1a2e; --card: #16213e; --text: #ffffff; --success: #2ecc71; }
         body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
-        .container { background: var(--card); padding: 30px; border-radius: 15px; width: 100%; max-width: 450px; border-top: 5px solid var(--primary); }
+        
+        .container { background: var(--card); padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; max-width: 450px; border-top: 5px solid var(--primary); }
+        
+        .nav-bar { display: flex; justify-content: space-between; margin-bottom: 20px; gap: 10px; }
+        .nav-btn { flex: 1; padding: 8px; border: none; border-radius: 5px; cursor: pointer; font-size: 0.8em; font-weight: bold; text-decoration: none; text-align: center; color: white; transition: 0.3s; }
+        .btn-logout { background: #444; }
+        .btn-admin { background: #f39c12; display: none; }
+
+        h2 { text-align: center; margin: 10px 0 5px 0; text-transform: uppercase; }
+        h4 { text-align: center; color: #888; font-weight: normal; margin-bottom: 25px; border-bottom: 1px solid #30475e; padding-bottom: 15px; }
+        
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-size: 0.85em; color: #aaa; }
-        input, textarea, select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #30475e; background: #1a1a2e; color: white; box-sizing: border-box; }
-        .date-row { display: flex; gap: 10px; margin-top: 5px; }
-        .date-row div { flex: 1; }
-        button#btn-submit { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--primary); color: white; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        #status-msg { text-align: center; margin-top: 15px; font-size: 0.9em; font-weight: bold; }
+        input, textarea, select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #30475e; background: #1a1a2e; color: white; box-sizing: border-box; font-family: inherit; }
+        
+        .date-row, .time-row { display: flex; gap: 10px; }
+        .date-row div, .time-row div { flex: 1; }
+
+        button#btn-submit { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--primary); color: white; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; font-size: 16px; }
+        button#btn-submit:disabled { background: #555; cursor: not-allowed; }
+        
+        #status-msg { text-align: center; margin-top: 15px; font-size: 0.9em; font-weight: bold; min-height: 1.5em; }
     </style>
 </head>
 <body>
 
 <div class="container">
+    <div class="nav-bar">
+        <a href="#" class="nav-btn btn-logout" onclick="logout()">Logout</a>
+        <a href="rekap.html" id="admin-link" class="nav-btn btn-admin">Panel Rekap</a>
+    </div>
+
     <div id="dashboard-content">
-        <h2 id="name-display" style="text-align:center;">Memuat...</h2>
-        <h4 id="rank-display" style="text-align:center; color:#888;">Pangkat | Divisi</h4>
+        <h2 id="name-display">Memuat...</h2>
+        <h4 id="rank-display">Pangkat | Divisi</h4>
 
         <form id="absensi-form">
             <div class="form-group">
@@ -48,23 +67,24 @@
                 </div>
             </div>
 
-            <div id="jam-section">
+            <div id="hadir-section">
                 <div class="form-group">
-                    <label>Waktu Duty</label>
-                    <div style="display:flex; gap:10px;">
-                        <input type="time" id="jam_mulai">
-                        <input type="time" id="jam_selesai">
+                    <label>Waktu Duty (Mulai - Selesai)</label>
+                    <div class="time-row">
+                        <div><input type="time" id="jam_mulai"></div>
+                        <div style="display:flex; align-items:center; color:#aaa;">s/d</div>
+                        <div><input type="time" id="jam_selesai"></div>
                     </div>
                 </div>
-                <div class="form-group" id="foto-section">
+                <div class="form-group">
                     <label>Bukti Foto (SS SAMP)</label>
                     <input type="file" id="bukti_foto" accept="image/*">
                 </div>
             </div>
 
             <div class="form-group">
-                <label id="label-kegiatan">Keterangan</label>
-                <textarea id="kegiatan" rows="3" required></textarea>
+                <label id="label-kegiatan">Kegiatan / Alasan</label>
+                <textarea id="kegiatan" rows="3" placeholder="Deskripsi..." required></textarea>
             </div>
 
             <button type="submit" id="btn-submit">Kirim Laporan</button>
@@ -74,108 +94,127 @@
 </div>
 
 <script>
-    const _supabase = window.supabase.createClient("URL_LU", "KEY_LU");
+    const _supabase = window.supabase.createClient("https://urclmvdkfkfwvdascobs.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4");
+
     const urlParams = new URLSearchParams(window.location.search);
     const discordId = urlParams.get('id');
+    const isAdmin = urlParams.get('admin') === 'true';
 
-    // Inisialisasi awal
+    if (!discordId) { window.location.href = "index.html"; }
+
+    // Load identitas awal dari URL
     document.getElementById('name-display').innerText = decodeURIComponent(urlParams.get('name') || "Unknown");
     document.getElementById('rank-display').innerText = `${decodeURIComponent(urlParams.get('pangkat') || "Unknown")} | ${decodeURIComponent(urlParams.get('divisi') || "-")}`;
-    toggleFormMode();
+    if (isAdmin) document.getElementById('admin-link').style.display = 'block';
 
     function toggleFormMode() {
         const status = document.getElementById('status_absen').value;
         const today = new Date().toISOString().split('T')[0];
-        
-        // Elemen
-        const singleDate = document.getElementById('single-date-section');
-        const rangeDate = document.getElementById('range-date-section');
-        const jamSection = document.getElementById('jam-section');
-        const inputTgl = document.getElementById('tanggal_absen');
-        const inputMulai = document.getElementById('cuti_mulai');
-        const inputSelesai = document.getElementById('cuti_selesai');
+        const hadirSec = document.getElementById('hadir-section');
+        const singleSec = document.getElementById('single-date-section');
+        const rangeSec = document.getElementById('range-date-section');
+        const fileInput = document.getElementById('bukti_foto');
 
         if (status === "CUTI") {
-            singleDate.style.display = "none";
-            rangeDate.style.display = "block";
-            jamSection.style.display = "none";
-            inputTgl.required = false;
-            inputMulai.required = true; inputSelesai.required = true;
-            inputMulai.min = today; inputSelesai.min = today;
+            singleSec.style.display = "none";
+            rangeSec.style.display = "block";
+            hadirSec.style.display = "none";
+            document.getElementById('cuti_mulai').min = today;
+            document.getElementById('cuti_selesai').min = today;
+            fileInput.required = false;
         } else {
-            singleDate.style.display = "block";
-            rangeDate.style.display = "none";
-            inputTgl.required = true;
-            inputMulai.required = false; inputSelesai.required = false;
-            
+            singleSec.style.display = "block";
+            rangeSec.style.display = "none";
+            const inputTgl = document.getElementById('tanggal_absen');
             if (status === "HADIR") {
                 inputTgl.max = today; inputTgl.removeAttribute('min');
-                jamSection.style.display = "block";
+                hadirSec.style.display = "block";
+                fileInput.required = true;
             } else {
                 inputTgl.min = today; inputTgl.removeAttribute('max');
-                jamSection.style.display = "none";
+                hadirSec.style.display = "none";
+                fileInput.required = false;
             }
         }
     }
 
+    function logout() { if (confirm("Logout?")) window.location.href = "index.html"; }
+
     document.getElementById('absensi-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const statusMsg = document.getElementById('status-msg');
+        const btn = document.getElementById('btn-submit');
+        const msg = document.getElementById('status-msg');
         const statusAbsen = document.getElementById('status_absen').value;
         
-        let dateList = [];
-        
-        // Logika Pengumpulan Tanggal
-        if (statusAbsen === "CUTI") {
-            let start = new Date(document.getElementById('cuti_mulai').value);
-            let end = new Date(document.getElementById('cuti_selesai').value);
-            
-            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                if (d.getDay() !== 0) { // 0 adalah Minggu/Sunday. Filter di sini.
-                    dateList.push(new Date(d));
-                }
-            }
-        } else {
-            let tgl = new Date(document.getElementById('tanggal_absen').value);
-            if (tgl.getDay() === 0) {
-                alert("Hari Minggu libur, tidak perlu absen!");
-                return;
-            }
-            dateList.push(tgl);
-        }
+        btn.disabled = true;
+        btn.innerText = "Memvalidasi Identitas...";
 
-        if (dateList.length === 0) {
-            alert("Tidak ada tanggal valid (Hari Minggu dilewati).");
-            return;
-        }
-
-        // Proses Kirim Massal
         try {
-            document.getElementById('btn-submit').disabled = true;
-            statusMsg.innerText = "Mengirim...";
+            // 1. CEK IDENTITAS TERBARU (Update Otomatis Nama/Pangkat/Divisi)
+            const { data: userUpdate, error: errUser } = await _supabase
+                .from('users_master').select('*').eq('discord_id', discordId).single();
+            if (errUser) throw new Error("Gagal verifikasi data master.");
 
-            const payload = dateList.map(date => ({
+            // 2. LOGIKA TANGGAL & FILTER HARI MINGGU
+            let dateList = [];
+            if (statusAbsen === "CUTI") {
+                let dStart = new Date(document.getElementById('cuti_mulai').value);
+                let dEnd = new Date(document.getElementById('cuti_selesai').value);
+                for (let d = new Date(dStart); d <= dEnd; d.setDate(d.getDate() + 1)) {
+                    if (d.getDay() !== 0) dateList.push(new Date(d));
+                }
+            } else {
+                let tglVal = new Date(document.getElementById('tanggal_absen').value);
+                if (tglVal.getDay() === 0) throw new Error("Hari Minggu libur, tidak perlu absen!");
+                dateList.push(tglVal);
+            }
+
+            if (dateList.length === 0) throw new Error("Tidak ada tanggal valid (Hari Minggu dilewati).");
+
+            // 3. UPLOAD FOTO (Hadir Saja)
+            let imgUrl = "N/A";
+            const file = document.getElementById('bukti_foto').files[0];
+            if (statusAbsen === "HADIR" && file) {
+                btn.innerText = "Mengunggah Foto...";
+                const path = `absensi/${Date.now()}_${discordId}.png`;
+                await _supabase.storage.from('bukti-absen').upload(path, file);
+                imgUrl = _supabase.storage.from('bukti-absen').getPublicUrl(path).data.publicUrl;
+            }
+
+            // 4. INSERT DATA KE DATABASE
+            btn.innerText = "Mengirim Laporan...";
+            const reports = dateList.map(d => ({
                 discord_id: discordId,
-                nama_anggota: document.getElementById('name-display').innerText,
-                pangkat: urlParams.get('pangkat') || "Unknown",
+                nama_anggota: userUpdate.nama_anggota,
+                pangkat: userUpdate.pangkat,
+                divisi: userUpdate.divisi,
                 jam_duty: (statusAbsen === "HADIR") ? `${document.getElementById('jam_mulai').value} - ${document.getElementById('jam_selesai').value}` : statusAbsen,
                 kegiatan: document.getElementById('kegiatan').value,
-                bukti_foto: "N/A", // Tambahkan logika upload jika HADIR
-                created_at: date.toISOString()
+                bukti_foto: imgUrl,
+                created_at: d.toISOString()
             }));
 
-            const { error } = await _supabase.from('absensi_sapd').insert(payload);
-            if (error) throw error;
+            const { error: errIns } = await _supabase.from('absensi_sapd').insert(reports);
+            if (errIns) throw errIns;
 
-            statusMsg.innerText = "✔ Berhasil! Hari Minggu otomatis dilewati.";
+            // Update UI & Reset
+            document.getElementById('name-display').innerText = userUpdate.nama_anggota;
+            document.getElementById('rank-display').innerText = `${userUpdate.pangkat} | ${userUpdate.divisi}`;
+            msg.innerText = "✔ Berhasil! Hari Minggu otomatis dilewati.";
+            msg.style.color = "#2ecc71";
             document.getElementById('absensi-form').reset();
             toggleFormMode();
+
         } catch (err) {
-            statusMsg.innerText = "Error: " + err.message;
+            msg.innerText = "Gagal: " + err.message;
+            msg.style.color = "#e94560";
         } finally {
-            document.getElementById('btn-submit').disabled = false;
+            btn.disabled = false;
+            btn.innerText = "Kirim Laporan";
         }
     });
+
+    toggleFormMode();
 </script>
 </body>
 </html>
