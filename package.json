@@ -1,0 +1,8 @@
+{
+  "name": "sapd-attendance",
+  "version": "1.0.0",
+  "dependencies": {
+    "@supabase/supabase-client": "^2.39.0",
+    "axios": "^1.6.0"
+  }
+}
