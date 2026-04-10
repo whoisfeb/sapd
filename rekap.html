@@ -140,52 +140,98 @@
         }).join('');
     }
 
-    // --- EKSPOR RAPI ---
-    function downloadExcel() {
-        const table = document.getElementById("table-rekap");
-        const dateRange = document.getElementById('label-minggu').innerText;
-        const tempTable = table.cloneNode(true);
-        
-        tempTable.querySelectorAll('tr').forEach(row => {
-            row.removeChild(row.lastElementChild); // Hapus kolom Aksi
-            row.querySelectorAll('td, th').forEach(cell => {
-                if (cell.innerHTML.includes('✔')) cell.innerText = 'V';
-                if (cell.innerHTML.includes('✘')) cell.innerText = '-';
-                if (cell.innerHTML.includes('Warning')) cell.innerText = 'WARN';
-            });
-        });
-
-        const wb = XLSX.utils.table_to_book(tempTable, { sheet: "Rekap" });
-        XLSX.writeFile(wb, `Rekap_SAPD_${dateRange.replace(/ /g, '_')}.xlsx`);
+    // --- EKSPOR EXCEL YANG RAPI ---
+function downloadExcel() {
+    const table = document.getElementById("table-rekap");
+    const dateRange = document.getElementById('label-minggu').innerText;
+    
+    // Buat data array untuk Excel agar benar-benar bersih dari HTML
+    const rows = [];
+    const headers = [];
+    
+    // Ambil Header (Hapus kolom terakhir/Aksi)
+    const headerCells = table.querySelectorAll("thead th");
+    for (let i = 0; i < headerCells.length - 1; i++) {
+        headers.push(headerCells[i].innerText);
     }
+    rows.push(headers);
 
-    function downloadPDF() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('l', 'mm', 'a4');
-        const dateRange = document.getElementById('label-minggu').innerText;
+    // Ambil Data Baris
+    const bodyRows = table.querySelectorAll("tbody tr");
+    bodyRows.forEach(row => {
+        const rowData = [];
+        const cells = row.querySelectorAll("td");
+        
+        for (let i = 0; i < cells.length - 1; i++) {
+            let cellText = cells[i].innerText.trim();
+            
+            // Konversi simbol agar rapi di Excel
+            if (cells[i].querySelector('.check-icon')) cellText = "V";
+            if (cells[i].querySelector('.cross-icon')) cellText = "-";
+            if (cellText.includes("Warning")) cellText = "WARN";
+            
+            rowData.push(cellText);
+        }
+        rows.push(rowData);
+    });
 
-        doc.text("REKAPITULASI GAJI & ABSENSI SAPD", 14, 15);
-        doc.setFontSize(10);
-        doc.text(`Periode: ${dateRange}`, 14, 22);
+    // Buat Workbook
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Rekap Gaji");
+    
+    // Atur Lebar Kolom agar otomatis rapi
+    ws['!cols'] = [{wch:25}, {wch:20}, {wch:5}, {wch:5}, {wch:5}, {wch:5}, {wch:5}, {wch:5}, {wch:10}, {wch:15}, {wch:10}];
 
-        doc.autoTable({
-            html: '#table-rekap',
-            startY: 30,
-            theme: 'grid',
-            headStyles: { fillColor: [233, 69, 96] },
-            columnStyles: { 9: { halign: 'right' } },
-            didParseCell: function(data) {
-                if (data.column.index === 11) data.cell.text = ""; 
-                if (data.cell.section === 'body') {
-                    let txt = data.cell.text[0];
-                    if (txt.includes('✔')) data.cell.text = ['V'];
-                    if (txt.includes('✘')) data.cell.text = ['-'];
-                    if (txt.includes('Warning')) data.cell.text = ['WARN'];
+    XLSX.writeFile(wb, `Rekap_SAPD_${dateRange.replace(/ /g, '_')}.xlsx`);
+}
+
+// --- EKSPOR PDF YANG RAPI (Anti-Error) ---
+function downloadPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('l', 'mm', 'a4');
+    const dateRange = document.getElementById('label-minggu').innerText;
+
+    doc.setFontSize(16);
+    doc.text("REKAPITULASI GAJI & ABSENSI SAPD", 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Periode: ${dateRange}`, 14, 22);
+
+    doc.autoTable({
+        html: '#table-rekap',
+        startY: 30,
+        theme: 'grid',
+        headStyles: { fillColor: [233, 69, 96], halign: 'center' },
+        styles: { fontSize: 8, cellPadding: 2 },
+        // Kolom yang akan diambil (0 sampai 10, kolom 11/Aksi dibuang)
+        columns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        didParseCell: function(data) {
+            // Cek apakah sel memiliki konten teks untuk menghindari error .includes()
+            let content = data.cell.raw ? data.cell.raw.innerText || "" : "";
+            
+            if (data.cell.section === 'body') {
+                // Bersihkan tampilan centang/silang
+                if (data.cell.raw.querySelector('.check-icon')) {
+                    data.cell.text = ['V'];
+                } else if (data.cell.raw.querySelector('.cross-icon')) {
+                    data.cell.text = ['-'];
+                }
+                
+                // Bersihkan tampilan Warning
+                if (content.includes("Warning")) {
+                    data.cell.text = ['WARN'];
+                }
+                
+                // Alignment Gaji ke kanan
+                if (data.column.index === 9) {
+                    data.cell.styles.halign = 'right';
                 }
             }
-        });
-        doc.save(`Rekap_SAPD_${dateRange.replace(/ /g, '_')}.pdf`);
-    }
+        }
+    });
+
+    doc.save(`Rekap_SAPD_${dateRange.replace(/ /g, '_')}.pdf`);
+}
 
     async function resetAllWeeklyData() {
         if (!confirm("Hapus semua data & foto minggu ini?")) return;
