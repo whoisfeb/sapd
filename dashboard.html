@@ -7,42 +7,47 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #e94560; --bg: #1a1a2e; --card: #16213e; --text: #ffffff; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
         .container { background: var(--card); padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; max-width: 450px; border-top: 5px solid var(--primary); }
         h2, h4 { text-align: center; margin-bottom: 5px; }
         .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-size: 0.9em; color: #bbb; }
+        label { display: block; margin-bottom: 5px; font-size: 0.85em; color: #aaa; }
         input, textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #30475e; background: #1a1a2e; color: white; box-sizing: border-box; }
         button { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--primary); color: white; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
-        button:disabled { background: #555; cursor: not-allowed; }
-        #status-msg { text-align: center; margin-top: 15px; font-size: 0.9em; }
+        button:disabled { background: #555; cursor: not-allowed; opacity: 0.7; }
+        #status-msg { text-align: center; margin-top: 15px; font-size: 0.9em; font-weight: bold; }
+        .loading-overlay { text-align: center; padding: 20px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div id="user-info">
-        <h2 id="display-name">Loading...</h2>
-        <h4 id="display-pangkat" style="color: #888; font-weight: normal;">Memverifikasi Akses...</h4>
+    <div id="loading-screen" class="loading-overlay">
+        <h3>Memverifikasi Akses...</h3>
+        <p style="font-size: 0.8em; color: #888;">Mengecek kredensial Role Inti...</p>
     </div>
 
-    <form id="absensi-form" style="display: none; margin-top: 20px;">
-        <div class="form-group">
-            <label>Jam Duty (Contoh: 20:00 - 22:00)</label>
-            <input type="text" id="jam_duty" placeholder="Masukkan jam mulai & selesai" required>
-        </div>
-        <div class="form-group">
-            <label>Kegiatan</label>
-            <textarea id="kegiatan" rows="3" placeholder="Apa saja yang kamu lakukan saat duty?" required></textarea>
-        </div>
-        <div class="form-group">
-            <label>Bukti Foto (SS SAMP)</label>
-            <input type="file" id="bukti_foto" accept="image/*" required>
-        </div>
-        <button type="submit" id="btn-kirim">Kirim Absensi</button>
-    </form>
-    
-    <div id="status-msg"></div>
+    <div id="main-content" style="display: none;">
+        <h2 id="display-name">Username</h2>
+        <h4 id="display-info" style="color: #888; font-weight: normal; margin-bottom: 20px;">Pangkat | Divisi</h4>
+
+        <form id="absensi-form">
+            <div class="form-group">
+                <label>Jam Duty (Contoh: 19:00 - 21:00)</label>
+                <input type="text" id="jam_duty" placeholder="Jam mulai s/d selesai" required>
+            </div>
+            <div class="form-group">
+                <label>Kegiatan</label>
+                <textarea id="kegiatan" rows="3" placeholder="Patroli, Response Code 3, dll." required></textarea>
+            </div>
+            <div class="form-group">
+                <label>Bukti Foto (SS SAMP)</label>
+                <input type="file" id="bukti_foto" accept="image/*" required>
+            </div>
+            <button type="submit" id="btn-kirim">Kirim Absensi</button>
+        </form>
+        <div id="status-msg"></div>
+    </div>
 </div>
 
 <script>
@@ -52,32 +57,33 @@
 
     const urlParams = new URLSearchParams(window.location.search);
     const discordId = urlParams.get('id');
-    const discordName = urlParams.get('name');
 
-    // 1. FUNGSI GATEKEEPER (VALIDASI ROLE INTI)
-    async function checkSecurityGate() {
+    // 1. GATEKEEPER KEAMANAN
+    async function verifyAccess() {
         if (!discordId) {
             window.location.href = "index.html";
             return;
         }
 
-        // Cek apakah user ada di tabel users_master (Hasil filter bot Role Inti)
+        // Cek apakah ID ada di users_master
         const { data: user, error } = await _supabase
             .from('users_master')
             .select('*')
             .eq('discord_id', discordId)
             .single();
 
+        // JIKA TIDAK ADA DI DATABASE: Langsung Blokir
         if (error || !user) {
-            // Jika ID tidak ditemukan di users_master, berarti tidak punya Role Inti
-            alert("AKSES DITOLAK: Anda tidak memiliki Role Inti (Required Role)!");
+            alert("AKSES DITOLAK: Anda tidak memiliki Role Inti atau data belum disinkronkan oleh Admin.");
             window.location.href = "index.html";
-        } else {
-            // Jika lolos, tampilkan form dan info user
-            document.getElementById('display-name').innerText = user.nama_anggota;
-            document.getElementById('display-pangkat').innerText = `${user.pangkat} | ${user.divisi}`;
-            document.getElementById('absensi-form').style.display = 'block';
+            return;
         }
+
+        // JIKA ADA DI DATABASE: Izinkan Masuk
+        document.getElementById('loading-screen').style.display = 'none';
+        document.getElementById('main-content').style.display = 'block';
+        document.getElementById('display-name').innerText = user.nama_anggota;
+        document.getElementById('display-info').innerText = `${user.pangkat} | ${user.divisi}`;
     }
 
     // 2. LOGIKA KIRIM ABSENSI
@@ -87,40 +93,41 @@
         const msg = document.getElementById('status-msg');
         
         btn.disabled = true;
-        btn.innerText = "Sabar, lagi upload...";
+        btn.innerText = "Mengupload Bukti...";
 
         const file = document.getElementById('bukti_foto').files[0];
-        const fileName = `${Date.now()}_${discordId}.png`;
+        const fileName = `absensi/${Date.now()}_${discordId}.png`;
 
-        // Upload Foto ke Bucket
+        // Upload ke Storage
         const { data: storageData, error: storageError } = await _supabase.storage
             .from('absensi-bukti')
             .upload(fileName, file);
 
         if (storageError) {
-            msg.innerText = "Gagal upload foto: " + storageError.message;
+            msg.innerText = "Gagal upload SS: " + storageError.message;
+            msg.style.color = "#e94560";
             btn.disabled = false;
             return;
         }
 
-        const { data: publicUrl } = _supabase.storage.from('bukti-absen').getPublicUrl(fileName);
+        const { data: publicUrl } = _supabase.storage.from('absensi-bukti').getPublicUrl(fileName);
 
-        // Simpan Data ke Tabel Absensi
+        // Masukkan ke Logs Kehadiran
         const { error: insertError } = await _supabase.from('absensi_sapd').insert([{
             discord_id: discordId,
             nama_anggota: document.getElementById('display-name').innerText,
-            pangkat: document.getElementById('display-pangkat').innerText.split(' | ')[0],
+            pangkat: document.getElementById('display-info').innerText.split(' | ')[0],
             jam_duty: document.getElementById('jam_duty').value,
             kegiatan: document.getElementById('kegiatan').value,
             bukti_foto: publicUrl.publicUrl
         }]);
 
         if (insertError) {
-            msg.style.color = "#ff4d4d";
-            msg.innerText = "Gagal kirim data: " + insertError.message;
+            msg.innerText = "Gagal simpan data: " + insertError.message;
+            msg.style.color = "#e94560";
         } else {
+            msg.innerText = "Absensi Berhasil Terkirim!";
             msg.style.color = "#2ecc71";
-            msg.innerText = "Berhasil! Absensi kamu sudah tercatat.";
             document.getElementById('absensi-form').reset();
         }
         
@@ -128,8 +135,7 @@
         btn.innerText = "Kirim Absensi";
     });
 
-    // Jalankan verifikasi saat halaman dibuka
-    checkSecurityGate();
+    verifyAccess();
 </script>
 
 </body>
