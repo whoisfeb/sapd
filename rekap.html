@@ -158,7 +158,7 @@
             "embeds": [{
                 "title": `📋 SURAT PERINGATAN (SP - ${newWarnCount})`,
                 "color": 15285324,
-                "description": `**Tanggal:** ${new Date().toLocaleDateString('id-ID')}\n**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat:** ${pangkat_anggota}\n\n**Alasan Peringatan:**\nTidak memenuhi kuota duty mingguan.\nDetail Bolos:\n${daftarBolos.join('\n')}\n\n**Pemberi Peringatan:** ${adminName}\n**Pangkat:** ${adminRank}`,
+                "description": `**Tanggal:** ${new Date().toLocaleDateString('id-ID')}\n**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat:** ${pangkat_anggota}\n\n**Alasan Peringatan:**\nTidak memenuhi syarat kehadiran mingguan.\nDetail Bolos:\n${daftarBolos.join('\n')}\n**Sisa SP:** ${newWarnCount}\n\n**Pemberi Peringatan:** ${adminName}\n**Pangkat:** ${adminRank}`,
                 "timestamp": new Date()
             }]
         };
