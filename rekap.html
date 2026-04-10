@@ -9,7 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <style>
-        :root { --primary: #e94560; --bg: #1a1a2e; --card: #16213e; --text: #ffffff; --success: #27ae60; --info: #2980b9; }
+        :root { --primary: #e94560; --bg: #1a1a2e; --card: #16213e; --text: #ffffff; --success: #27ae60; --info: #2980b9; --warning: #f39c12; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); padding: 20px; margin: 0; }
         .header-area { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; gap: 10px; }
         .action-buttons { display: flex; gap: 10px; }
@@ -23,13 +23,13 @@
         .btn-reset { background: var(--primary); }
         .btn-excel { background: var(--success); }
         .btn-pdf { background: var(--info); }
-        .btn-warning { background: #f39c12; padding: 4px 8px; cursor: pointer; border-radius: 3px; border:none; color:white; font-size: 0.9em; }
+        .btn-warning { background: var(--warning); padding: 4px 8px; cursor: pointer; border-radius: 3px; border:none; color:white; font-size: 0.9em; }
         .salary-text { color: #2ecc71; font-weight: bold; }
-        .check-icon { color: #2ecc71; font-weight: bold; font-size: 1.2em; }
-        .cross-icon { color: #e94560; opacity: 0.3; font-size: 1.1em; }
+        .check-icon { color: var(--success); font-weight: bold; font-size: 1.2em; }
+        .cross-icon { color: var(--primary); opacity: 0.5; font-size: 1.1em; }
+        .status-ic { color: var(--warning); font-weight: bold; font-size: 1.1em; }
         .nav-btn-small { background: #30475e; color: white; border: none; padding: 8px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .unwarn-link { color: #e94560; font-size: 10px; text-decoration: none; margin-top: 4px; display: block; cursor: pointer; }
-        .unwarn-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -37,7 +37,7 @@
     <div class="header-area">
         <div>
             <h2 style="margin: 0;">SAPD ADMIN - REKAP & PAYROLL</h2>
-            <p style="color: #888; margin: 5px 0 0 0;">Manajemen Warning & Payroll Otomatis</p>
+            <p style="color: #888; margin: 5px 0 0 0;">Status: I (Izin), C (Cuti), ✔ (Hadir), ✘ (Alpa)</p>
         </div>
         <div class="action-buttons">
             <a href="javascript:history.back()" class="btn btn-back">⬅ Dashboard</a>
@@ -107,8 +107,10 @@
         logs.forEach(log => {
             const d = new Date(log.created_at).getDay();
             if (userWeekly[log.discord_id] && d !== 0) {
-                userWeekly[log.discord_id].days[d] = log.bukti_foto;
-                if (!log.jam_duty.includes("IZIN") && !log.jam_duty.includes("CUTI")) userWeekly[log.discord_id].totalHadir++;
+                const ket = (log.jam_duty || "").toUpperCase();
+                userWeekly[log.discord_id].days[d] = { foto: log.bukti_foto, ket: ket };
+                // Hanya hitung hadir jika tidak Izin/Cuti
+                if (!ket.includes("IZIN") && !ket.includes("CUTI")) userWeekly[log.discord_id].totalHadir++;
             }
         });
 
@@ -126,12 +128,18 @@
                    </div>` 
                 : `<span style="color:gray">Aktif</span>`;
             
-            const icon = (idx) => u.days[idx] ? `<span class="check-icon">✔</span>` : `<span class="cross-icon">✘</span>`;
+            const getIcon = (idx) => {
+                const data = u.days[idx];
+                if (!data) return `<span class="cross-icon">✘</span>`;
+                if (data.ket.includes("IZIN")) return `<span class="status-ic">I</span>`;
+                if (data.ket.includes("CUTI")) return `<span class="status-ic">C</span>`;
+                return `<span class="check-icon">✔</span>`;
+            };
 
             return `<tr>
                 <td style="text-align:left;"><b>${u.info.nama_anggota}</b></td>
                 <td>${u.info.pangkat}</td>
-                <td>${icon(1)}</td><td>${icon(2)}</td><td>${icon(3)}</td><td>${icon(4)}</td><td>${icon(5)}</td><td>${icon(6)}</td>
+                <td>${getIcon(1)}</td><td>${getIcon(2)}</td><td>${getIcon(3)}</td><td>${getIcon(4)}</td><td>${getIcon(5)}</td><td>${getIcon(6)}</td>
                 <td>${u.totalHadir}/6</td>
                 <td class="salary-text">$${Math.floor(totalGaji).toLocaleString()}</td>
                 <td>${warnBtn}</td>
@@ -140,114 +148,62 @@
         }).join('');
     }
 
-    // Fungsi Update Daftar di Discord (Urut Pangkat tapi Pangkat tidak ditulis)
     async function updateDiscordList() {
         const { data: masters } = await _supabase.from('users_master').select('nama_anggota, pangkat, total_warning, discord_id');
-        
-        // Tetap diurutkan agar Chief di atas, Cadet di bawah
-        masters.sort((a, b) => {
-            const rankA = RANK_ORDER[a.pangkat.toUpperCase()] || 99;
-            const rankB = RANK_ORDER[b.pangkat.toUpperCase()] || 99;
-            return rankA - rankB;
-        });
+        masters.sort((a, b) => (RANK_ORDER[a.pangkat.toUpperCase()] || 99) - (RANK_ORDER[b.pangkat.toUpperCase()] || 99));
 
-        let listText = "## 📊 DAFTAR TOTAL WARNING ANGGOTA SAPD\n";
-        listText += "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
-
+        let listText = "## 📊 DAFTAR TOTAL WARNING ANGGOTA SAPD\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
         masters.forEach(m => {
             const w = m.total_warning || 0;
             const emoji = w >= 3 ? "🔴" : (w > 0 ? "🟡" : "🟢");
-            
-            // Proteksi ID Discord agar tidak error 400
-            const tag = (m.discord_id && !isNaN(m.discord_id)) ? `<@${m.discord_id}>` : `*ID Missing*`;
-            
-            // Format: Nama (Tag) : SP
+            const tag = (m.discord_id && !isNaN(m.discord_id)) ? `<@${m.discord_id}>` : `*No ID*`;
             listText += `${emoji} ${m.nama_anggota} (${tag}) : \`${w} SP\`\n`;
         });
-
-        listText += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
-        listText += `*Terakhir diperbarui: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB*`;
-        
+        listText += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n*Terakhir diperbarui: " + new Date().toLocaleString('id-ID') + " WIB*";
         return listText.substring(0, 1990);
     }
 
     async function sendWarning(discord_id, nama_anggota, currentWarn) {
         if (!confirm(`Kirim SP-${currentWarn + 1} ke Discord?`)) return;
-        const { mon } = getWeekRange(currentWeekOffset);
-        const u = userWeekly[discord_id];
-        const daftarBolos = [];
-        const namaHari = ["", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-        
-        for (let i = 1; i <= 6; i++) {
-            if (!u.days[i]) {
-                const tgl = new Date(mon);
-                tgl.setDate(mon.getDate() + (i - 1));
-                daftarBolos.push(`- ${namaHari[i]}, ${tgl.toLocaleDateString('id-ID')}`);
-            }
-        }
-
         const newWarnCount = currentWarn + 1;
-        const logPayload = {
-            "content": "@everyone <@&1444908462067945623>",
-            "embeds": [{
-                "title": `📋 SURAT PERINGATAN (SP - ${newWarnCount})`,
-                "color": 15285324,
-                "description": `**Nama:** ${nama_anggota} (<@${discord_id}>)\n**Total SP:** ${newWarnCount}\n**Alasan:** Bolos ${daftarBolos.length} hari:\n${daftarBolos.join('\n')}`,
-                "timestamp": new Date()
-            }]
-        };
-
         try {
             await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
             const newList = await updateDiscordList();
             const res = await fetch('/.netlify/functions/send-warning', { 
                 method: 'POST', 
-                body: JSON.stringify({ payload: logPayload, updateList: newList }) 
+                body: JSON.stringify({ payload: { content: `@everyone <@${discord_id}> Menerima SP-${newWarnCount}` }, updateList: newList }) 
             });
-
-            if (res.ok) {
-                alert(`✅ BERHASIL: SP-${newWarnCount} terkirim & Daftar diperbarui!`);
-                loadData();
-            }
+            if (res.ok) { alert("Berhasil!"); loadData(); }
         } catch (e) { alert("Error!"); }
     }
 
     async function removeWarning(discord_id, nama_anggota, currentWarn) {
         if (!confirm(`Cabut SP untuk ${nama_anggota}?`)) return;
         const newWarnCount = Math.max(0, currentWarn - 1);
-        const logPayload = {
-            "content": "<@&1444908462067945623>",
-            "embeds": [{
-                "title": "🔓 PENCABUTAN SURAT PERINGATAN",
-                "color": 3066993,
-                "description": `**Nama:** ${nama_anggota} (<@${discord_id}>)\n**Status:** 1 SP Dicabut\n**Sisa SP:** ${newWarnCount}`,
-                "timestamp": new Date()
-            }]
-        };
-
         try {
             await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
             const newList = await updateDiscordList();
             await fetch('/.netlify/functions/send-warning', { 
                 method: 'POST', 
-                body: JSON.stringify({ payload: logPayload, updateList: newList }) 
+                body: JSON.stringify({ payload: { content: `SP ${nama_anggota} telah dicabut.` }, updateList: newList }) 
             });
-            alert("✅ BERHASIL: SP dicabut & Daftar diperbarui!");
-            loadData();
+            alert("Berhasil dicabut!"); loadData();
         } catch (e) { alert("Error!"); }
     }
 
-    // --- TOOLS ---
+    // --- EXPORT TOOLS ---
     function downloadExcel() {
         const table = document.getElementById("table-rekap");
-        const rows = [["Nama Anggota", "Pangkat", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Total", "Gaji", "Status"]];
+        const rows = [["Nama Anggota", "Pangkat", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Total", "Gaji"]];
         table.querySelectorAll("tbody tr").forEach(tr => {
             const rowData = [];
             tr.querySelectorAll("td").forEach((td, idx) => {
-                if (idx < 11) {
-                    let txt = td.innerText.split('\n')[0].trim();
-                    if (td.querySelector('.check-icon')) txt = "V";
-                    if (td.querySelector('.cross-icon')) txt = "-";
+                if (idx < 10) {
+                    let txt = td.innerText.trim();
+                    if (td.querySelector('.check-icon')) txt = "HADIR";
+                    if (td.querySelector('.cross-icon')) txt = "ALPA";
+                    if (txt === "I") txt = "IZIN";
+                    if (txt === "C") txt = "CUTI";
                     rowData.push(txt);
                 }
             });
@@ -264,11 +220,13 @@
         const doc = new jsPDF('l', 'mm', 'a4');
         doc.autoTable({
             html: '#table-rekap',
-            columns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            columns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
             didParseCell: function(data) {
                 if (data.cell.section === 'body') {
-                    if (data.cell.raw.querySelector && data.cell.raw.querySelector('.check-icon')) data.cell.text = ['V'];
-                    else if (data.cell.raw.querySelector && data.cell.raw.querySelector('.cross-icon')) data.cell.text = ['-'];
+                    const txt = data.cell.raw.innerText;
+                    if (txt === '✔') { data.cell.styles.fillColor = [39, 174, 96]; data.cell.styles.textColor = 255; }
+                    else if (txt === 'I' || txt === 'C') { data.cell.styles.fillColor = [243, 156, 18]; data.cell.styles.textColor = 255; }
+                    else if (txt === '✘') { data.cell.styles.fillColor = [233, 69, 96]; data.cell.styles.textColor = 255; }
                 }
             }
         });
@@ -285,20 +243,6 @@
         return { mon, sun };
     }
     
-    async function resetUser(id) {
-        if (!confirm("Hapus data anggota periode ini?")) return;
-        const { mon, sun } = getWeekRange(currentWeekOffset);
-        await _supabase.from('absensi_sapd').delete().eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
-        loadData();
-    }
-
-    async function resetAllWeeklyData() {
-        if (!confirm("Hapus SEMUA data minggu ini?")) return;
-        const { mon, sun } = getWeekRange(currentWeekOffset);
-        await _supabase.from('absensi_sapd').delete().gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
-        loadData();
-    }
-
     function changeWeek(dir) { currentWeekOffset += dir; loadData(); }
     loadData();
 </script>
