@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>SAPD Admin - Rekap & Payroll</title>
+    <title>SAPD Admin - Rekap & Payroll Berurutan</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #e94560; --bg: #1a1a2e; --card: #16213e; --text: #ffffff; }
@@ -13,7 +13,7 @@
         th { background: #0f3460; position: sticky; top: 0; }
         .btn { padding: 8px 15px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; color: white; }
         .btn-reset { background: #e94560; margin-bottom: 15px; }
-        .btn-warning { background: #f39c12; padding: 2px 5px; cursor: pointer; border-radius: 3px; }
+        .btn-warning { background: #f39c12; padding: 2px 5px; cursor: pointer; border-radius: 3px; border:none; color:white; }
         .salary-text { color: #2ecc71; font-weight: bold; }
         .check-icon { color: #2ecc71; font-weight: bold; }
         .cross-icon { color: #e94560; opacity: 0.3; }
@@ -53,6 +53,20 @@
 <script>
     const _supabase = window.supabase.createClient("https://urclmvdkfkfwvdascobs.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4");
 
+    // DEFINISI URUTAN PANGKAT (Semakin kecil angka, semakin tinggi posisinya)
+    const RANK_ORDER = {
+        "CHIEF OF POLICE": 1,
+        "ASSISTANT CHIEF OF POLICE": 2,
+        "DEPUTY CHIEF OF POLICE": 3,
+        "COMMANDER": 4,
+        "CAPTAIN III": 5, "CAPTAIN II": 6, "CAPTAIN I": 7,
+        "LIEUTENANT III": 8, "LIEUTENANT II": 9, "LIEUTENANT I": 10,
+        "SERGEANT III": 11, "SERGEANT II": 12, "SERGEANT I": 13,
+        "DETECTIVE III": 14, "DETECTIVE II": 15, "DETECTIVE I": 16,
+        "POLICE OFFICER III": 17, "POLICE OFFICER II": 18, "POLICE OFFICER I": 19,
+        "CADET": 20
+    };
+
     const BASE_SALARY = {
         "CHIEF OF POLICE": 80000, "ASSISTANT CHIEF OF POLICE": 76000, "DEPUTY CHIEF OF POLICE": 72000, "COMMANDER": 68000,
         "CAPTAIN III": 64000, "CAPTAIN II": 60000, "CAPTAIN I": 56000,
@@ -77,10 +91,17 @@
 
     async function loadData() {
         const { mon, sun } = getWeekRange(currentWeekOffset);
-        document.getElementById('label-minggu').innerText = `Periote: ${mon.toLocaleDateString('id-ID')} - ${sun.toLocaleDateString('id-ID')}`;
+        document.getElementById('label-minggu').innerText = `Periode: ${mon.toLocaleDateString('id-ID')} - ${sun.toLocaleDateString('id-ID')}`;
 
         const { data: logs } = await _supabase.from('absensi_sapd').select('*').gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
         const { data: masters } = await _supabase.from('users_master').select('*');
+
+        // --- LOGIKA SORTING BERDASARKAN PANGKAT ---
+        masters.sort((a, b) => {
+            const rankA = RANK_ORDER[a.pangkat.toUpperCase()] || 99;
+            const rankB = RANK_ORDER[b.pangkat.toUpperCase()] || 99;
+            return rankA - rankB;
+        });
 
         const userWeekly = {};
         masters.forEach(m => {
@@ -91,18 +112,30 @@
             const d = new Date(log.created_at).getDay();
             if (userWeekly[log.discord_id] && d !== 0) {
                 userWeekly[log.discord_id].days[d] = log.bukti_foto;
-                if (log.jam_duty !== "IZIN" && log.jam_duty !== "CUTI") {
+                // Hitung hadir hanya jika bukan IZIN/CUTI
+                if (log.jam_duty !== "HADIR" && !log.jam_duty.includes("IZIN") && !log.jam_duty.includes("CUTI")) {
+                    // Logic: Jika jam_duty berisi "19:00 - 21:00" (berarti hadir)
+                    userWeekly[log.discord_id].totalHadir++;
+                } else if (log.jam_duty.includes(" - ")) { 
+                    // Backup check jika format jam duty adalah "HH:mm - HH:mm"
                     userWeekly[log.discord_id].totalHadir++;
                 }
             }
         });
 
-        document.getElementById('tbody-weekly').innerHTML = Object.values(userWeekly).map(u => {
+        document.getElementById('tbody-weekly').innerHTML = masters.map(m => {
+            const u = userWeekly[m.discord_id];
             const gajiPokok = BASE_SALARY[u.info.pangkat.toUpperCase()] || 0;
+            
+            // Hitung Gaji: (Gaji / 5) * jumlah hadir (maksimal 5)
             let totalGaji = (gajiPokok / 5) * Math.min(u.totalHadir, 5);
-            if (u.totalHadir >= 6) totalGaji += 10000; // Bonus Rajin
+            
+            // Bonus jika hadir 6 hari
+            if (u.totalHadir >= 6) totalGaji += 10000;
 
-            const warningBtn = (u.totalHadir < 3) ? `<button class="btn-warning" onclick="sendWarning('${u.info.discord_id}', '${u.info.nama_anggota}')">⚠️ Warning</button>` : `<span style="color:gray">Aman</span>`;
+            const warningBtn = (u.totalHadir < 3) 
+                ? `<button class="btn-warning" onclick="sendWarning('${u.info.discord_id}', '${u.info.nama_anggota}')">⚠️ Warning</button>` 
+                : `<span style="color:gray; font-size:0.9em;">Aman</span>`;
 
             const renderIcon = (idx) => u.days[idx] ? `<span class="check-icon">✔</span>` : `<span class="cross-icon">✘</span>`;
 
@@ -113,7 +146,7 @@
                     <td>${renderIcon(1)}</td><td>${renderIcon(2)}</td><td>${renderIcon(3)}</td>
                     <td>${renderIcon(4)}</td><td>${renderIcon(5)}</td><td>${renderIcon(6)}</td>
                     <td>${u.totalHadir} / 6 Hari</td>
-                    <td class="salary-text">$${totalGaji.toLocaleString()}</td>
+                    <td class="salary-text">$${Math.floor(totalGaji).toLocaleString()}</td>
                     <td>${warningBtn}</td>
                     <td><button onclick="resetUser('${u.info.discord_id}')" style="background:none; border:none; cursor:pointer;">🗑</button></td>
                 </tr>`;
@@ -122,36 +155,30 @@
 
     async function resetAllWeeklyData() {
         if (!confirm("PERINGATAN! Semua data absensi & gambar di minggu ini akan DIHAPUS PERMANEN. Lanjutkan?")) return;
-        
         const { mon, sun } = getWeekRange(currentWeekOffset);
         
-        // 1. Ambil list bukti_foto untuk dihapus dari storage
         const { data: logs } = await _supabase.from('absensi_sapd').select('bukti_foto').gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
         
-        const filePaths = logs.filter(l => l.bukti_foto !== "N/A").map(l => {
-            const parts = l.bukti_foto.split('/bukti-absen/');
-            return parts[1];
+        const filePaths = logs.filter(l => l.bukti_foto && l.bukti_foto !== "N/A").map(l => {
+            return l.bukti_foto.split('/bukti-absen/')[1];
         });
 
         if (filePaths.length > 0) {
             await _supabase.storage.from('bukti-absen').remove(filePaths);
         }
 
-        // 2. Hapus data dari Database
         await _supabase.from('absensi_sapd').delete().gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
-        
-        alert("Data minggu ini berhasil dibersihkan!");
+        alert("Data periode ini berhasil dibersihkan!");
         loadData();
     }
 
     function sendWarning(id, nama) {
-        // Nanti format kirim ke discord ditaruh di sini sesuai permintaanmu
-        console.log(`Mengirim peringatan SP-1 untuk ${nama} (${id})`);
-        alert(`Peringatan 3 hari bolos untuk ${nama} telah diproses.`);
+        alert(`Sistem Warning: ${nama} terdeteksi kurang aktif (< 3 hari). Laporan akan diteruskan ke Internal Affairs.`);
+        // Tambahkan fungsi webhook Discord di sini nanti
     }
 
     async function resetUser(id) {
-        if(confirm("Hapus data user ini di minggu ini saja?")) {
+        if(confirm("Hapus data user ini di periode ini?")) {
             const { mon, sun } = getWeekRange(currentWeekOffset);
             await _supabase.from('absensi_sapd').delete().eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
             loadData();
@@ -159,6 +186,7 @@
     }
 
     function changeWeek(dir) { currentWeekOffset += dir; loadData(); }
+    
     loadData();
 </script>
 </body>
