@@ -140,18 +140,30 @@
         }).join('');
     }
 
-    // Fungsi Update Daftar di Discord
+    // Fungsi Update Daftar di Discord (Urut Berdasarkan Pangkat & Tagging)
     async function updateDiscordList() {
-        const { data: masters } = await _supabase.from('users_master').select('nama_anggota, total_warning');
-        masters.sort((a, b) => (b.total_warning || 0) - (a.total_warning || 0));
+        // Ambil data termasuk discord_id untuk tagging
+        const { data: masters } = await _supabase.from('users_master').select('nama_anggota, pangkat, total_warning, discord_id');
+        
+        // Urutkan berdasarkan pangkat tertinggi (RANK_ORDER)
+        masters.sort((a, b) => {
+            const rankA = RANK_ORDER[a.pangkat.toUpperCase()] || 99;
+            const rankB = RANK_ORDER[b.pangkat.toUpperCase()] || 99;
+            return rankA - rankB;
+        });
 
-        let listText = "**📊 DAFTAR TOTAL WARNING ANGGOTA SAPD**\n\n";
+        let listText = "## 📊 DAFTAR TOTAL WARNING ANGGOTA SAPD\n";
+        listText += "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
+
         masters.forEach(m => {
             const w = m.total_warning || 0;
             const emoji = w >= 3 ? "🔴" : (w > 0 ? "🟡" : "🟢");
-            listText += `${emoji} ${m.nama_anggota} : **${w}**\n`;
+            // Format: [Emoji] PANGKAT | Nama (Tag Discord) : SP
+            listText += `${emoji} **${m.pangkat}** | ${m.nama_anggota} (<@${m.discord_id}>) : \`${w} SP\`\n`;
         });
-        listText += `\n*Terakhir diperbarui: ${new Date().toLocaleString('id-ID')}*`;
+
+        listText += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+        listText += `*Terakhir diperbarui: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB*`;
         return listText;
     }
 
@@ -206,7 +218,7 @@
             "embeds": [{
                 "title": "🔓 PENCABUTAN SURAT PERINGATAN",
                 "color": 3066993,
-                "description": `**Nama:** ${nama_anggota}\n**Status:** 1 SP Dicabut\n**Sisa SP Sekarang:** ${newWarnCount}`,
+                "description": `**Nama:** ${nama_anggota} (<@${discord_id}>)\n**Status:** 1 SP Dicabut\n**Sisa SP Sekarang:** ${newWarnCount}`,
                 "timestamp": new Date()
             }]
         };
