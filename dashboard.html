@@ -11,21 +11,21 @@
         
         .container { background: var(--card); padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; max-width: 450px; border-top: 5px solid var(--primary); position: relative; }
         
-        /* Navigasi Bar */
         .nav-bar { display: flex; justify-content: space-between; margin-bottom: 20px; gap: 10px; }
         .nav-btn { flex: 1; padding: 8px; border: none; border-radius: 5px; cursor: pointer; font-size: 0.8em; font-weight: bold; text-decoration: none; text-align: center; color: white; transition: 0.3s; }
         .btn-logout { background: #444; }
-        .btn-logout:hover { background: #666; }
-        .btn-admin { background: #f39c12; display: none; } /* Tersembunyi default */
-        .btn-admin:hover { background: #e67e22; }
+        .btn-admin { background: #f39c12; display: none; }
 
         h2 { text-align: center; margin-top: 10px; margin-bottom: 5px; text-transform: uppercase; }
         h4 { text-align: center; color: #888; font-weight: normal; margin-bottom: 25px; border-bottom: 1px solid #30475e; padding-bottom: 15px; }
         
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-size: 0.85em; color: #aaa; }
-        input, textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #30475e; background: #1a1a2e; color: white; box-sizing: border-box; }
+        input, textarea, select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #30475e; background: #1a1a2e; color: white; box-sizing: border-box; font-family: inherit; }
         
+        .time-row { display: flex; gap: 10px; }
+        .time-row div { flex: 1; }
+
         button#btn-submit { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--primary); color: white; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; font-size: 16px; }
         button#btn-submit:disabled { background: #555; cursor: not-allowed; }
         
@@ -46,17 +46,37 @@
 
         <form id="absensi-form">
             <div class="form-group">
-                <label>Jam Duty (Contoh: 19:00 - 21:00)</label>
-                <input type="text" id="jam_duty" placeholder="Jam mulai s/d selesai" required>
+                <label>Status Kehadiran</label>
+                <select id="status_absen" onchange="toggleFormMode()" required>
+                    <option value="HADIR">HADIR (ON DUTY)</option>
+                    <option value="IZIN">IZIN (HALANGAN)</option>
+                    <option value="CUTI">CUTI (LONG TERM)</option>
+                </select>
             </div>
-            <div class="form-group">
-                <label>Kegiatan</label>
-                <textarea id="kegiatan" rows="3" placeholder="Apa saja yang dilakukan?" required></textarea>
+
+            <div class="form-group" id="jam-section">
+                <label>Waktu Duty (Mulai - Selesai)</label>
+                <div class="time-row">
+                    <div>
+                        <input type="time" id="jam_mulai" required>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: center; color: #aaa;">s/d</div>
+                    <div>
+                        <input type="time" id="jam_selesai" required>
+                    </div>
+                </div>
             </div>
+
             <div class="form-group">
-                <label>Bukti Foto (SS SAMP)</label>
+                <label id="label-kegiatan">Keterangan / Kegiatan</label>
+                <textarea id="kegiatan" rows="3" placeholder="Apa saja yang dilakukan / Alasan izin?" required></textarea>
+            </div>
+
+            <div class="form-group" id="foto-section">
+                <label>Bukti Foto (SS SAMP / Bukti Pendukung)</label>
                 <input type="file" id="bukti_foto" accept="image/*" required>
             </div>
+
             <button type="submit" id="btn-submit">Kirim Absensi</button>
         </form>
         <div id="status-msg"></div>
@@ -64,7 +84,6 @@
 </div>
 
 <script>
-    // 1. Inisialisasi Supabase
     const SUPABASE_URL = "https://urclmvdkfkfwvdascobs.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4"; 
     const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -74,58 +93,78 @@
     const urlName = urlParams.get('name');
     const urlPangkat = urlParams.get('pangkat');
     const urlDivisi = urlParams.get('divisi');
-    const isAdmin = urlParams.get('admin') === 'true'; // Cek status admin dari URL
+    const isAdmin = urlParams.get('admin') === 'true';
 
-    // Tampilkan data & Cek Tombol Admin
     if (!discordId) {
         window.location.href = "index.html";
     } else {
         document.getElementById('name-display').innerText = decodeURIComponent(urlName || "Unknown");
         document.getElementById('rank-display').innerText = `${decodeURIComponent(urlPangkat || "Unknown")} | ${decodeURIComponent(urlDivisi || "-")}`;
-        
-        // Tampilkan tombol admin jika status admin=true
-        if (isAdmin) {
-            document.getElementById('admin-link').style.display = 'block';
+        if (isAdmin) document.getElementById('admin-link').style.display = 'block';
+    }
+
+    // Fungsi untuk mengubah form jika user pilih Izin/Cuti
+    function toggleFormMode() {
+        const status = document.getElementById('status_absen').value;
+        const jamSection = document.getElementById('jam-section');
+        const fotoSection = document.getElementById('foto-section');
+        const jamMulai = document.getElementById('jam_mulai');
+        const jamSelesai = document.getElementById('jam_selesai');
+        const labelKegiatan = document.getElementById('label-kegiatan');
+
+        if (status === "HADIR") {
+            jamSection.style.display = "block";
+            jamMulai.required = true;
+            jamSelesai.required = true;
+            labelKegiatan.innerText = "Kegiatan";
+        } else {
+            // Sembunyikan jam jika Izin/Cuti (Opsional, atau biarkan kosong)
+            jamSection.style.display = "none";
+            jamMulai.required = false;
+            jamSelesai.required = false;
+            labelKegiatan.innerText = "Alasan " + status;
         }
     }
 
     function logout() {
-        if (confirm("Apakah anda ingin logout?")) {
-            window.location.href = "index.html";
-        }
+        if (confirm("Apakah anda ingin logout?")) window.location.href = "index.html";
     }
 
-    // 2. Logika Submit (Tembak ke Netlify Function)
     document.getElementById('absensi-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = document.getElementById('btn-submit');
         const msg = document.getElementById('status-msg');
         
         btn.disabled = true;
-        btn.innerText = "Memverifikasi Role & Mengirim...";
+        btn.innerText = "Memproses...";
         msg.innerText = "";
 
+        const statusAbsen = document.getElementById('status_absen').value;
+        const jamMulai = document.getElementById('jam_mulai').value;
+        const jamSelesai = document.getElementById('jam_selesai').value;
         const file = document.getElementById('bukti_foto').files[0];
-        const fileName = `absensi/${Date.now()}_${discordId}.png`;
+        
+        let finalJam = (statusAbsen === "HADIR") ? `${jamMulai} - ${jamSelesai}` : statusAbsen;
+        let publicUrlStr = "";
 
         try {
-            // A. Upload Foto
-            const { error: storageError } = await _supabase.storage
-                .from('bukti-absen')
-                .upload(fileName, file);
-
+            // 1. Upload Foto
+            const fileName = `absensi/${Date.now()}_${discordId}.png`;
+            const { error: storageError } = await _supabase.storage.from('bukti-absen').upload(fileName, file);
             if (storageError) throw new Error("Gagal upload foto");
 
-            const { data: publicUrl } = _supabase.storage.from('bukti-absen').getPublicUrl(fileName);
+            const { data: pUrl } = _supabase.storage.from('bukti-absen').getPublicUrl(fileName);
+            publicUrlStr = pUrl.publicUrl;
 
-            // B. Kirim ke Backend (submit-absensi)
+            // 2. Kirim ke Backend
             const payload = {
                 discordId: discordId,
                 nama_anggota: document.getElementById('name-display').innerText,
                 pangkat: urlPangkat || "Unknown",
-                jam_duty: document.getElementById('jam_duty').value,
+                jam_duty: finalJam, // Isi: "19:00 - 21:00" atau "IZIN"
                 kegiatan: document.getElementById('kegiatan').value,
-                bukti_foto: publicUrl.publicUrl
+                bukti_foto: publicUrlStr,
+                status: statusAbsen // Tambahan status jika ingin dipisah di DB
             };
 
             const response = await fetch('/.netlify/functions/submit-absensi', {
@@ -135,19 +174,20 @@
             });
 
             if (response.status === 403) {
-                alert("AKSES DITOLAK: Role Anda dicabut!");
+                alert("AKSES DITOLAK!");
                 window.location.href = "index.html";
                 return;
             }
 
-            if (!response.ok) throw new Error("Gagal verifikasi data");
+            if (!response.ok) throw new Error("Gagal kirim data ke server");
 
-            msg.innerText = "✔ Absensi Berhasil Terkirim!";
+            msg.innerText = "✔ Berhasil Terkirim!";
             msg.style.color = "#2ecc71";
             document.getElementById('absensi-form').reset();
+            toggleFormMode();
 
         } catch (err) {
-            msg.innerText = "Gagal: " + err.message;
+            msg.innerText = "Error: " + err.message;
             msg.style.color = "#e94560";
         } finally {
             btn.disabled = false;
@@ -155,6 +195,5 @@
         }
     });
 </script>
-
 </body>
 </html>
