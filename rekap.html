@@ -13,9 +13,9 @@
         th { background: #0f3460; }
         .tab-btn { background: none; border: none; color: gray; cursor: pointer; font-size: 1.1em; margin-right: 20px; padding-bottom: 5px; font-weight: bold; }
         .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
-        .check-icon { color: #2ecc71; font-weight: bold; font-size: 1.2em; }
+        .check-icon { color: #2ecc71; font-weight: bold; font-size: 1.2em; text-decoration: none; }
         .cross-icon { color: #e94560; font-weight: bold; opacity: 0.3; }
-        .btn-reset { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-bottom: 15px; }
+        .badge-alpa { background: #e94560; padding: 2px 8px; border-radius: 4px; font-size: 0.9em; }
     </style>
 </head>
 <body>
@@ -53,7 +53,7 @@
 
     <div id="tab-monitoring" class="tab-content" style="display:none;">
         <div class="card">
-            <h3>Belum Absen Hari Ini (Role Inti)</h3>
+            <h3>Belum Absen Hari Ini (Monitoring Real-time)</h3>
             <table id="table-alpa">
                 <thead>
                     <tr><th>Nama</th><th>Pangkat</th><th>Divisi</th><th>Status</th></tr>
@@ -66,18 +66,29 @@
 <script>
     const _supabase = window.supabase.createClient("https://urclmvdkfkfwvdascobs.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4");
 
-    // Fungsi mendapatkan rentang tanggal minggu ini (Senin - Minggu)
+    // Urutan Pangkat Kepolisian (Priority)
+    const RANK_PRIORITY = {
+        "CHIEF OF POLICE": 1,
+        "ASSISTANT CHIEF OF POLICE": 2,
+        "DEPUTY CHIEF OF POLICE": 3,
+        "COMMANDER": 4,
+        "CAPTAIN III": 5, "CAPTAIN II": 6, "CAPTAIN I": 7,
+        "LIEUTENANT III": 8, "LIEUTENANT II": 9, "LIEUTENANT I": 10,
+        "SERGEANT III": 11, "SERGEANT II": 12, "SERGEANT I": 13,
+        "DETECTIVE III": 14, "DETECTIVE II": 15, "DETECTIVE I": 16,
+        "POLICE OFFICER III": 17, "POLICE OFFICER II": 18, "POLICE OFFICER I": 19,
+        "CADET": 20, "Unknown": 99
+    };
+
     function getWeekRange() {
         const now = new Date();
         const day = now.getDay();
-        const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Penyesuaian ke hari Senin
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
         const monday = new Date(now.setDate(diff));
         monday.setHours(0,0,0,0);
-        
         const sunday = new Date(monday);
         sunday.setDate(monday.getDate() + 6);
         sunday.setHours(23,59,59,999);
-        
         return { monday, sunday };
     }
 
@@ -85,7 +96,7 @@
         const { monday, sunday } = getWeekRange();
         document.getElementById('label-minggu').innerText = `Periode: ${monday.toLocaleDateString()} - ${sunday.toLocaleDateString()}`;
 
-        // 1. Ambil data logs minggu ini & data master
+        // 1. Ambil logs & masters
         const { data: logs } = await _supabase.from('absensi_sapd')
             .select('*')
             .gte('created_at', monday.toISOString())
@@ -93,10 +104,15 @@
             
         const { data: masters } = await _supabase.from('users_master').select('*');
 
-        // 2. Olah data logs menjadi format Mingguan per User
+        // 2. Sorting Masters berdasarkan Pangkat
+        masters.sort((a, b) => {
+            const pA = RANK_PRIORITY[a.pangkat] || 99;
+            const pB = RANK_PRIORITY[b.pangkat] || 99;
+            return pA - pB;
+        });
+
+        // 3. Olah data mingguan
         const userWeeklyData = {};
-        
-        // Inisialisasi semua anggota master agar muncul di tabel (meskipun belum absen)
         masters.forEach(m => {
             userWeeklyData[m.discord_id] = {
                 info: m,
@@ -104,39 +120,40 @@
             };
         });
 
-        // Isi data absensi ke dalam hari yang sesuai
         logs.forEach(log => {
-            const logDate = new Date(log.created_at);
-            const dayNum = logDate.getDay(); // 0 = Minggu, 1 = Senin, dst.
+            const dayNum = new Date(log.created_at).getDay();
             if (userWeeklyData[log.discord_id]) {
                 userWeeklyData[log.discord_id].days[dayNum] = log.bukti_foto;
             }
         });
 
-        // 3. Render Tabel Weekly
+        // 4. Render Tabel Weekly (Sudah Terurut)
         document.getElementById('tbody-weekly').innerHTML = Object.values(userWeeklyData).map(u => {
-            const renderDay = (dayIndex) => {
-                return u.days[dayIndex] 
-                    ? `<a href="${u.days[dayIndex]}" target="_blank" class="check-icon">✔</a>` 
-                    : `<span class="cross-icon">✘</span>`;
-            };
+            const renderDay = (idx) => u.days[idx] 
+                ? `<a href="${u.days[idx]}" target="_blank" class="check-icon">✔</a>` 
+                : `<span class="cross-icon">✘</span>`;
 
             return `
                 <tr>
                     <td style="text-align:left;"><b>${u.info.nama_anggota}</b></td>
                     <td>${u.info.pangkat}</td>
                     <td>${u.info.divisi}</td>
-                    <td>${renderDay(1)}</td> <td>${renderDay(2)}</td> <td>${renderDay(3)}</td> <td>${renderDay(4)}</td> <td>${renderDay(5)}</td> <td>${renderDay(6)}</td> <td>${renderDay(0)}</td> <td><button onclick="resetUser('${u.info.discord_id}')" style="background:none; border:none; cursor:pointer;">🗑</button></td>
-                </tr>
-            `;
+                    <td>${renderDay(1)}</td><td>${renderDay(2)}</td><td>${renderDay(3)}</td>
+                    <td>${renderDay(4)}</td><td>${renderDay(5)}</td><td>${renderDay(6)}</td><td>${renderDay(0)}</td>
+                    <td><button onclick="resetUser('${u.info.discord_id}')" style="background:none; border:none; cursor:pointer;">🗑</button></td>
+                </tr>`;
         }).join('');
 
-        // 4. Render Alpa (Hari Ini Saja)
+        // 5. Render Alpa (Urutan Pangkat Tetap Terjaga)
         const hariIni = new Date().getDay();
         const bolos = Object.values(userWeeklyData).filter(u => !u.days[hariIni]);
         document.querySelector('#table-alpa tbody').innerHTML = bolos.map(u => `
-            <tr><td>${u.info.nama_anggota}</td><td>${u.info.pangkat}</td><td>${u.info.divisi}</td><td><span class="badge-alpa">ALPA</span></td></tr>
-        `).join('');
+            <tr>
+                <td>${u.info.nama_anggota}</td>
+                <td>${u.info.pangkat}</td>
+                <td>${u.info.divisi}</td>
+                <td><span class="badge-alpa">ALPA</span></td>
+            </tr>`).join('');
     }
 
     async function resetUser(discordId) {
