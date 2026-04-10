@@ -7,31 +7,23 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #e94560; --bg: #1a1a2e; --card: #16213e; --text: #ffffff; --success: #2ecc71; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
         .container { background: var(--card); padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; max-width: 450px; border-top: 5px solid var(--primary); }
-        h2 { text-align: center; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
+        h2 { text-align: center; margin-bottom: 5px; text-transform: uppercase; }
         h4 { text-align: center; color: #888; font-weight: normal; margin-bottom: 25px; border-bottom: 1px solid #30475e; padding-bottom: 15px; }
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-size: 0.85em; color: #aaa; }
-        input, textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #30475e; background: #1a1a2e; color: white; box-sizing: border-box; font-size: 14px; transition: 0.3s; }
-        input:focus, textarea:focus { border-color: var(--primary); outline: none; }
-        button { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--primary); color: white; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; font-size: 16px; }
-        button:hover { background: #ff5e78; transform: translateY(-2px); }
-        button:disabled { background: #555; cursor: not-allowed; transform: none; }
+        input, textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #30475e; background: #1a1a2e; color: white; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--primary); color: white; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+        button:disabled { background: #555; cursor: not-allowed; }
         #status-msg { text-align: center; margin-top: 15px; font-size: 0.9em; font-weight: bold; min-height: 1.5em; }
-        .loading-overlay { text-align: center; padding: 20px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div id="loading-screen" class="loading-overlay">
-        <h3>Memvalidasi Sesi...</h3>
-        <p style="color: #666; font-size: 0.8em;">Menghubungkan ke API SAPD</p>
-    </div>
-
-    <div id="dashboard-content" style="display: none;">
-        <h2 id="name-display">Username</h2>
+    <div id="dashboard-content">
+        <h2 id="name-display">Memuat...</h2>
         <h4 id="rank-display">Pangkat | Divisi</h4>
 
         <form id="absensi-form">
@@ -54,9 +46,9 @@
 </div>
 
 <script>
-    // 1. Inisialisasi Supabase (Tetap diperlukan untuk upload foto)
+    // 1. Inisialisasi Supabase
     const SUPABASE_URL = "https://urclmvdkfkfwvdascobs.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4"; // Ganti dengan key anda
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4"; 
     const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -65,19 +57,15 @@
     const urlPangkat = urlParams.get('pangkat');
     const urlDivisi = urlParams.get('divisi');
 
-    // 2. Fungsi Kick jika tidak ada ID
-    function checkInitialAuth() {
-        if (!discordId) {
-            window.location.href = "index.html";
-            return;
-        }
-        document.getElementById('loading-screen').style.display = 'none';
-        document.getElementById('dashboard-content').style.display = 'block';
+    // Tampilkan data dari URL ke UI
+    if (!discordId) {
+        window.location.href = "index.html";
+    } else {
         document.getElementById('name-display').innerText = decodeURIComponent(urlName || "Unknown");
         document.getElementById('rank-display').innerText = `${decodeURIComponent(urlPangkat || "Unknown")} | ${decodeURIComponent(urlDivisi || "-")}`;
     }
 
-    // 3. Logika Submit (Verifikasi Backend)
+    // 2. Logika Submit (Tembak ke Netlify Function)
     document.getElementById('absensi-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -85,27 +73,27 @@
         const msg = document.getElementById('status-msg');
         
         btn.disabled = true;
-        btn.innerText = "Memverifikasi Role...";
+        btn.innerText = "Memeriksa Role & Mengirim...";
         msg.innerText = "";
 
-        // A. Upload Foto ke Supabase Storage
         const file = document.getElementById('bukti_foto').files[0];
         const fileName = `absensi/${Date.now()}_${discordId}.png`;
 
         try {
-            const { data: storageData, error: storageError } = await _supabase.storage
+            // A. Upload Foto ke Supabase Storage
+            const { error: storageError } = await _supabase.storage
                 .from('bukti-absen')
                 .upload(fileName, file);
 
-            if (storageError) throw new Error("Gagal upload foto");
+            if (storageError) throw new Error("Gagal upload foto ke storage");
 
             const { data: publicUrl } = _supabase.storage.from('bukti-absen').getPublicUrl(fileName);
 
-            // B. Kirim Data ke Netlify Function untuk Cek Role & Simpan
+            // B. Kirim ke Backend (Netlify Function: submit-absensi)
             const payload = {
                 discordId: discordId,
                 nama_anggota: document.getElementById('name-display').innerText,
-                pangkat: urlPangkat,
+                pangkat: urlPangkat || "Unknown",
                 jam_duty: document.getElementById('jam_duty').value,
                 kegiatan: document.getElementById('kegiatan').value,
                 bukti_foto: publicUrl.publicUrl
@@ -117,29 +105,28 @@
                 body: JSON.stringify(payload)
             });
 
+            // JIKA ROLE DICABUT (Status 403 dari Backend)
             if (response.status === 403) {
-                // INI ADALAH TRIGGER JIKA ROLE DICABUT
-                alert("AKSES DITOLAK: Role Inti Anda tidak ditemukan di Discord. Anda akan dikeluarkan.");
+                alert("AKSES DITOLAK: Role Inti Anda dicabut atau tidak terdeteksi!");
                 window.location.href = "index.html";
                 return;
             }
 
-            if (!response.ok) throw new Error("Gagal verifikasi data");
+            if (!response.ok) throw new Error("Gagal verifikasi data ke server");
 
+            // Berhasil
             msg.innerText = "✔ Absensi Berhasil Terkirim!";
-            msg.style.color = var(--success);
+            msg.style.color = "#2ecc71"; // Pakai kode HEX, jangan var CSS
             document.getElementById('absensi-form').reset();
 
         } catch (err) {
             msg.innerText = "Gagal: " + err.message;
-            msg.style.color = var(--primary);
+            msg.style.color = "#e94560";
         } finally {
             btn.disabled = false;
             btn.innerText = "Kirim Absensi";
         }
     });
-
-    checkInitialAuth();
 </script>
 
 </body>
