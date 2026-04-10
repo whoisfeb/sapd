@@ -103,7 +103,7 @@
             return;
         }
 
-        const { data: publicUrl } = _supabase.storage.from('absensi-bukti').getPublicUrl(fileName);
+        const { data: publicUrl } = _supabase.storage.from('bukti-absen').getPublicUrl(fileName);
 
         // Simpan Data ke Tabel Absensi
         const { error: insertError } = await _supabase.from('absensi_sapd').insert([{
