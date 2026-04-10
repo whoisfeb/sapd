@@ -6,7 +6,12 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANO
 exports.handler = async (event) => {
     if (event.httpMethod !== "POST") return { statusCode: 405, body: "Method Not Allowed" };
 
-    const { discordId, jam_duty, kegiatan, bukti_foto, nama_anggota, pangkat } = JSON.parse(event.body);
+    // Dashboard sekarang mengirim payload berupa ARRAY (reports)
+    const body = JSON.parse(event.body);
+    
+    // Jika dashboard mengirim array (masal), kita ambil discordId dari elemen pertama
+    const reports = Array.isArray(body) ? body : [body];
+    const discordId = reports[0].discord_id;
 
     try {
         // --- PROSES PENGECEKAN ROLE REAL-TIME ---
@@ -30,14 +35,19 @@ exports.handler = async (event) => {
         }
 
         // JIKA ROLE MASIH ADA: Masukkan ke database absensi
-        const { error } = await supabase.from('absensi_sapd').insert([{
-            discord_id: discordId,
-            nama_anggota,
-            pangkat,
-            jam_duty,
-            kegiatan,
-            bukti_foto
-        }]);
+        // Kita langsung masukkan seluruh array reports agar efisien
+        const { error } = await supabase.from('absensi_sapd').insert(
+            reports.map(r => ({
+                discord_id: r.discord_id,
+                nama_anggota: r.nama_anggota,
+                pangkat: r.pangkat,
+                divisi: r.divisi, // Tambahkan kolom divisi
+                jam_duty: r.jam_duty,
+                kegiatan: r.kegiatan,
+                bukti_foto: r.bukti_foto,
+                created_at: r.created_at // Menggunakan tanggal yang dikirim dashboard (Penting untuk Cuti/Izin)
+            }))
+        );
 
         if (error) throw error;
 
@@ -48,6 +58,9 @@ exports.handler = async (event) => {
 
     } catch (err) {
         console.error(err);
-        return { statusCode: 500, body: JSON.stringify({ message: "Server Error / User tidak ditemukan di Discord" }) };
+        return { 
+            statusCode: 500, 
+            body: JSON.stringify({ message: "Server Error / User tidak ditemukan di Discord" }) 
+        };
     }
 };
