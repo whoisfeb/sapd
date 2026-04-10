@@ -7,13 +7,17 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #e94560; --bg: #1a1a2e; --card: #16213e; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .container { background: var(--card); padding: 30px; border-radius: 15px; width: 90%; max-width: 400px; text-align: center; border-top: 5px solid var(--primary); }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .container { background: var(--card); padding: 30px; border-radius: 15px; width: 100%; max-width: 450px; text-align: center; border-top: 5px solid var(--primary); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         .user-info { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #30475e; }
-        input[type="file"] { margin: 15px 0; font-size: 0.8em; }
-        .btn-absen { background: var(--primary); color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; }
+        .form-group { text-align: left; margin-bottom: 15px; }
+        label { display: block; font-size: 0.9em; color: #aaa; margin-bottom: 5px; }
+        input[type="text"], textarea, input[type="file"] { width: 100%; padding: 10px; background: #1a1a2e; border: 1px solid #30475e; border-radius: 5px; color: white; box-sizing: border-box; }
+        textarea { resize: vertical; height: 80px; }
+        .btn-absen { background: var(--primary); color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; transition: 0.3s; }
+        .btn-absen:hover { background: #ff5e78; }
         .btn-absen:disabled { background: #555; cursor: not-allowed; }
-        .holiday-msg { color: var(--primary); font-weight: bold; font-size: 1.5em; display: none; }
+        .holiday-msg { color: var(--primary); font-weight: bold; font-size: 1.5em; display: none; padding: 40px 0; }
     </style>
 </head>
 <body>
@@ -21,18 +25,31 @@
 <div class="container">
     <div class="user-info">
         <h3 id="user-name">Memuat...</h3>
-        <p id="user-pangkat" style="color: #aaa;"></p>
+        <p id="user-pangkat" style="color: #aaa; margin: 5px 0;"></p>
     </div>
 
     <div id="absensi-section">
-        <p>Silakan upload bukti foto kegiatan (SS SAMP):</p>
-        <input type="file" id="bukti-foto" accept="image/*">
+        <div class="form-group">
+            <label>Jam Duty (Contoh: 20:00 - 22:00)</label>
+            <input type="text" id="jam-duty" placeholder="Masukkan jam mulai & selesai">
+        </div>
+
+        <div class="form-group">
+            <label>Kegiatan</label>
+            <textarea id="kegiatan" placeholder="Apa saja yang kamu lakukan saat duty?"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label>Bukti Foto (SS SAMP)</label>
+            <input type="file" id="bukti-foto" accept="image/*">
+        </div>
+
         <button id="btn-submit" class="btn-absen" onclick="kirimAbsen()">Kirim Absensi</button>
     </div>
 
     <div id="holiday-section" class="holiday-msg">
         LIBUR WOI!<br>
-        <span style="font-size: 0.5em; color: gray;">Hari Minggu waktunya istirahat.</span>
+        <span style="font-size: 0.5em; color: gray;">Minggu jangan kerja, healing dulu sana.</span>
     </div>
 </div>
 
@@ -50,51 +67,52 @@
     document.getElementById('user-pangkat').innerText = userPangkat || "-";
 
     // Cek Hari Minggu
-    const hariIni = new Date().getDay(); 
-    if (hariIni === 0) {
+    if (new Date().getDay() === 0) {
         document.getElementById('absensi-section').style.display = 'none';
         document.getElementById('holiday-section').style.display = 'block';
     }
 
     async function kirimAbsen() {
+        const jam = document.getElementById('jam-duty').value;
+        const kegiatan = document.getElementById('kegiatan').value;
         const fileInput = document.getElementById('bukti-foto');
         const btn = document.getElementById('btn-submit');
 
-        if (!fileInput.files[0]) return alert("Mana bukti fotonya? Jangan mau gaji buta!");
+        if (!jam || !kegiatan || !fileInput.files[0]) {
+            return alert("Lengkapi semua data! Jam, Kegiatan, dan Foto wajib ada.");
+        }
 
         btn.disabled = true;
-        btn.innerText = "Mengirim...";
+        btn.innerText = "Sabar, lagi upload...";
 
         try {
+            // 1. Upload Foto
             const file = fileInput.files[0];
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${Date.now()}_${userId}.${fileExt}`;
-
-            // 1. Upload ke Storage Bucket "bukti-absen"
-            const { data: uploadData, error: uploadErr } = await _supabase.storage
+            const fileName = `${Date.now()}_${userId}.png`;
+            const { data: upData, error: upErr } = await _supabase.storage
                 .from('bukti-absen')
                 .upload(fileName, file);
 
-            if (uploadErr) throw uploadErr;
+            if (upErr) throw upErr;
+            const photoUrl = _supabase.storage.from('bukti-absen').getPublicUrl(fileName).data.publicUrl;
 
-            const publicUrl = _supabase.storage.from('bukti-absen').getPublicUrl(fileName).data.publicUrl;
-
-            // 2. Insert ke Database
+            // 2. Simpan Data
             const { error: dbErr } = await _supabase.from('absensi_sapd').insert({
                 discord_id: userId,
                 nama_anggota: userName,
                 pangkat: userPangkat,
                 tipe_absen: 'Hadir',
-                bukti_foto: publicUrl
+                jam_duty: jam,
+                kegiatan: kegiatan,
+                bukti_foto: photoUrl
             });
 
             if (dbErr) throw dbErr;
 
-            alert("Absensi berhasil dikirim!");
-            fileInput.value = "";
+            alert("Absensi terkirim! Mantap anggota.");
+            location.reload(); 
         } catch (err) {
-            alert("Error: " + err.message);
-        } finally {
+            alert("Gagal: " + err.message);
             btn.disabled = false;
             btn.innerText = "Kirim Absensi";
         }
