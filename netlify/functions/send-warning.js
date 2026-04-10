@@ -6,7 +6,7 @@ exports.handler = async (event, context) => {
 
   try {
     const payload = JSON.parse(event.body);
-    const WEBHOOK_URL = process.env.warning_webhook; // Mengambil dari Env Netlify
+    const WEBHOOK_URL = process.env.WARNING_WEBHOOK; // Mengambil dari Env Netlify
 
     const response = await fetch(WEBHOOK_URL, {
       method: 'POST',
