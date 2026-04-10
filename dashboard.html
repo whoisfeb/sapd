@@ -2,121 +2,84 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SAPD Dashboard - Absensi</title>
+    <title>SAPD Admin - Rekap Detail</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #e94560; --bg: #1a1a2e; --card: #16213e; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
-        .container { background: var(--card); padding: 30px; border-radius: 15px; width: 100%; max-width: 450px; text-align: center; border-top: 5px solid var(--primary); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .user-info { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #30475e; }
-        .form-group { text-align: left; margin-bottom: 15px; }
-        label { display: block; font-size: 0.9em; color: #aaa; margin-bottom: 5px; }
-        input[type="text"], textarea, input[type="file"] { width: 100%; padding: 10px; background: #1a1a2e; border: 1px solid #30475e; border-radius: 5px; color: white; box-sizing: border-box; }
-        textarea { resize: vertical; height: 80px; }
-        .btn-absen { background: var(--primary); color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; transition: 0.3s; }
-        .btn-absen:hover { background: #ff5e78; }
-        .btn-absen:disabled { background: #555; cursor: not-allowed; }
-        .holiday-msg { color: var(--primary); font-weight: bold; font-size: 1.5em; display: none; padding: 40px 0; }
+        body { font-family: sans-serif; background: var(--bg); color: white; padding: 20px; }
+        .card { background: var(--card); padding: 20px; border-radius: 10px; margin-bottom: 20px; border-top: 4px solid var(--primary); overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85em; min-width: 800px; }
+        th, td { border: 1px solid #30475e; padding: 12px; text-align: left; }
+        th { background: #0f3460; }
+        .tab-btn { background: none; border: none; color: gray; cursor: pointer; font-size: 1.1em; margin-right: 20px; padding-bottom: 5px; }
+        .tab-btn.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
+        .btn-reset { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-bottom: 15px; font-weight: bold; }
+        .img-link { color: #00d2ff; text-decoration: none; font-weight: bold; }
+        .badge-alpa { background: #dc3545; padding: 4px 8px; border-radius: 4px; font-size: 0.8em; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="user-info">
-        <h3 id="user-name">Memuat...</h3>
-        <p id="user-pangkat" style="color: #aaa; margin: 5px 0;"></p>
+    <h2>SAPD ADMINISTRATIVE PANEL</h2>
+
+    <div class="tab-menu" style="margin-bottom: 20px;">
+        <button class="tab-btn active" onclick="showTab(event, 'tab-rekap')">Log Kehadiran</button>
+        <button class="tab-btn" onclick="showTab(event, 'tab-monitoring')">Monitoring Alpa</button>
     </div>
 
-    <div id="absensi-section">
-        <div class="form-group">
-            <label>Jam Duty (Contoh: 20:00 - 22:00)</label>
-            <input type="text" id="jam-duty" placeholder="Masukkan jam mulai & selesai">
+    <div id="tab-rekap" class="tab-content">
+        <button class="btn-reset" onclick="hapusSemua()">Reset Absensi Mingguan</button>
+        <div class="card">
+            <table id="table-rekap">
+                <thead><tr><th>Waktu</th><th>Nama</th><th>Jam Duty</th><th>Kegiatan</th><th>Bukti</th><th>Aksi</th></tr></thead>
+                <tbody></tbody>
+            </table>
         </div>
-
-        <div class="form-group">
-            <label>Kegiatan</label>
-            <textarea id="kegiatan" placeholder="Apa saja yang kamu lakukan saat duty?"></textarea>
-        </div>
-
-        <div class="form-group">
-            <label>Bukti Foto (SS SAMP)</label>
-            <input type="file" id="bukti-foto" accept="image/*">
-        </div>
-
-        <button id="btn-submit" class="btn-absen" onclick="kirimAbsen()">Kirim Absensi</button>
     </div>
 
-    <div id="holiday-section" class="holiday-msg">
-        LIBUR WOI!<br>
-        <span style="font-size: 0.5em; color: gray;">Minggu jangan kerja, healing dulu sana.</span>
+    <div id="tab-monitoring" class="tab-content" style="display:none;">
+        <div class="card">
+            <h3>Belum Absen Hari Ini</h3>
+            <table id="table-alpa">
+                <thead><tr><th>Nama Anggota</th><th>Pangkat</th><th>Status</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </div>
-</div>
 
 <script>
-    const params = new URLSearchParams(window.location.search);
-    const userId = params.get('id');
-    const userName = params.get('name');
-    const userPangkat = params.get('pangkat');
-
     const SUPABASE_URL = "https://urclmvdkfkfwvdascobs.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4"; 
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4";
     const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    document.getElementById('user-name').innerText = userName || "User";
-    document.getElementById('user-pangkat').innerText = userPangkat || "-";
+    async function loadData() {
+        const { data: logs } = await _supabase.from('absensi_sapd').select('*').order('created_at', { ascending: false });
+        const { data: masters } = await _supabase.from('users_master').select('*');
 
-    // Cek Hari Minggu
-    if (new Date().getDay() === 0) {
-        document.getElementById('absensi-section').style.display = 'none';
-        document.getElementById('holiday-section').style.display = 'block';
+        const tbodyRekap = document.querySelector('#table-rekap tbody');
+        tbodyRekap.innerHTML = logs.map(row => `
+            <tr>
+                <td>${new Date(row.created_at).toLocaleString('id-ID')}</td>
+                <td><b>${row.nama_anggota}</b><br><small>${row.pangkat}</small></td>
+                <td>${row.jam_duty || '-'}</td>
+                <td>${row.kegiatan || '-'}</td>
+                <td><a href="${row.bukti_foto}" target="_blank" class="img-link">Lihat SS</a></td>
+                <td><button onclick="hapusData('${row.id}')" style="background:#dc3545; color:white; border:none; cursor:pointer;">Hapus</button></td>
+            </tr>
+        `).join('');
+
+        const hariIni = new Date().toLocaleDateString('id-ID');
+        const idSudahAbsen = logs.filter(l => new Date(l.created_at).toLocaleDateString('id-ID') === hariIni).map(l => l.discord_id);
+        const bolos = masters.filter(m => !idSudahAbsen.includes(m.discord_id));
+
+        const tbodyAlpa = document.querySelector('#table-alpa tbody');
+        tbodyAlpa.innerHTML = bolos.map(m => `<tr><td>${m.nama_anggota}</td><td>${m.pangkat}</td><td><span class="badge-alpa">ALPA</span></td></tr>`).join('');
     }
 
-    async function kirimAbsen() {
-        const jam = document.getElementById('jam-duty').value;
-        const kegiatan = document.getElementById('kegiatan').value;
-        const fileInput = document.getElementById('bukti-foto');
-        const btn = document.getElementById('btn-submit');
-
-        if (!jam || !kegiatan || !fileInput.files[0]) {
-            return alert("Lengkapi semua data! Jam, Kegiatan, dan Foto wajib ada.");
-        }
-
-        btn.disabled = true;
-        btn.innerText = "Sabar, lagi upload...";
-
-        try {
-            // 1. Upload Foto
-            const file = fileInput.files[0];
-            const fileName = `${Date.now()}_${userId}.png`;
-            const { data: upData, error: upErr } = await _supabase.storage
-                .from('bukti-absen')
-                .upload(fileName, file);
-
-            if (upErr) throw upErr;
-            const photoUrl = _supabase.storage.from('bukti-absen').getPublicUrl(fileName).data.publicUrl;
-
-            // 2. Simpan Data
-            const { error: dbErr } = await _supabase.from('absensi_sapd').insert({
-                discord_id: userId,
-                nama_anggota: userName,
-                pangkat: userPangkat,
-                tipe_absen: 'Hadir',
-                jam_duty: jam,
-                kegiatan: kegiatan,
-                bukti_foto: photoUrl
-            });
-
-            if (dbErr) throw dbErr;
-
-            alert("Absensi terkirim! Mantap anggota.");
-            location.reload(); 
-        } catch (err) {
-            alert("Gagal: " + err.message);
-            btn.disabled = false;
-            btn.innerText = "Kirim Absensi";
-        }
-    }
+    async function hapusData(id) { if(confirm("Hapus?")) { await _supabase.from('absensi_sapd').delete().eq('id', id); loadData(); } }
+    async function hapusSemua() { if(confirm("Reset semua log?")) { await _supabase.from('absensi_sapd').delete().neq('id', 0); loadData(); } }
+    function showTab(e, id) { document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none'); document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.getElementById(id).style.display = 'block'; e.target.classList.add('active'); }
+    loadData();
 </script>
 </body>
 </html>
