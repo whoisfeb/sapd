@@ -71,13 +71,23 @@
 
             const cWarn = m.total_warning || 0;
             const getIcon = (idx) => {
-                const data = u.days[idx];
-                if (!data) return `<span class="cross-icon">✘</span>`;
-                if (data.ket.includes("IZIN")) return `<span class="status-ic">I</span>`;
-                if (data.ket.includes("CUTI")) return `<span class="status-ic">C</span>`;
-                return `<span class="check-icon">✔</span>`;
-            };
-
+    const data = u.days[idx];
+    if (!data) return `<span class="cross-icon">✘</span>`;
+    if (data.ket.includes("IZIN")) return `<span class="status-ic">I</span>`;
+    if (data.ket.includes("CUTI")) return `<span class="status-ic">C</span>`;
+    
+    // Jika ada bukti_gambar, buat ikon centang bisa diklik
+    if (data.bukti_gambar) {
+        // Ganti 'bukti-absen' dan 'absensi' sesuai nama bucket & folder kamu
+        const imageUrl = `https://urclmvdkfkfwvdascobs.supabase.co/storage/v1/object/public/bukti-absen/absensi/${data.bukti_gambar}`;
+        
+        return `<a href="${imageUrl}" target="_blank" style="text-decoration:none;">
+                    <span class="check-icon" title="Klik untuk lihat bukti">✔</span>
+                </a>`;
+    }
+    
+    return `<span class="check-icon">✔</span>`;
+};
             const currentAdminName = localStorage.getItem("nama_user");
             const currentAdminRank = localStorage.getItem("pangkat");
 
