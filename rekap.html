@@ -310,16 +310,74 @@
     }
     
     async function resetUser(id) {
-        if (!confirm("Hapus data absensi anggota ini di minggu ini?")) return;
+        if (!confirm("Hapus data absensi & bukti gambar anggota ini di minggu ini?")) return;
+        
         const { mon, sun } = getWeekRange(currentWeekOffset);
-        await _supabase.from('absensi_sapd').delete().eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+    
+        // 1. Ambil daftar bukti_gambar dari tabel
+        const { data: logs } = await _supabase
+            .from('absensi_sapd')
+            .select('bukti_gambar')
+            .eq('discord_id', id)
+            .gte('created_at', mon.toISOString())
+            .lte('created_at', sun.toISOString());
+    
+        if (logs && logs.length > 0) {
+            // Pastikan path menyertakan nama folder 'absensi/' sesuai di screenshot storage
+            const filesToRemove = logs
+                .map(log => log.bukti_gambar ? `absensi/${log.bukti_gambar}` : null)
+                .filter(path => path !== null);
+    
+            if (filesToRemove.length > 0) {
+                // Hapus dari bucket 'bukti-absen'
+                await _supabase.storage
+                    .from('bukti-absen') 
+                    .remove(filesToRemove);
+            }
+        }
+    
+        // 2. Hapus data di database
+        await _supabase.from('absensi_sapd')
+            .delete()
+            .eq('discord_id', id)
+            .gte('created_at', mon.toISOString())
+            .lte('created_at', sun.toISOString());
+    
+        alert("Data dan Gambar di folder absensi berhasil dihapus!");
         loadData();
     }
 
     async function resetAllWeeklyData() {
-        if (!confirm("Hapus SEMUA data absensi minggu ini?")) return;
+        if (!confirm("Hapus SEMUA data absensi & bukti gambar minggu ini?")) return;
+        
         const { mon, sun } = getWeekRange(currentWeekOffset);
-        await _supabase.from('absensi_sapd').delete().gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+    
+        // 1. Ambil semua bukti_gambar minggu ini
+        const { data: allLogs } = await _supabase
+            .from('absensi_sapd')
+            .select('bukti_gambar')
+            .gte('created_at', mon.toISOString())
+            .lte('created_at', sun.toISOString());
+    
+        if (allLogs && allLogs.length > 0) {
+            const filesToRemove = allLogs
+                .map(log => log.bukti_gambar ? `absensi/${log.bukti_gambar}` : null)
+                .filter(path => path !== null);
+    
+            if (filesToRemove.length > 0) {
+                await _supabase.storage
+                    .from('bukti-absen')
+                    .remove(filesToRemove);
+            }
+        }
+    
+        // 2. Hapus database
+        await _supabase.from('absensi_sapd')
+            .delete()
+            .gte('created_at', mon.toISOString())
+            .lte('created_at', sun.toISOString());
+    
+        alert("Seluruh data dan gambar minggu ini telah dibersihkan!");
         loadData();
     }
 
