@@ -14,7 +14,8 @@
         .nav-bar { display: flex; justify-content: space-between; margin-bottom: 20px; gap: 10px; }
         .nav-btn { flex: 1; padding: 8px; border: none; border-radius: 5px; cursor: pointer; font-size: 0.8em; font-weight: bold; text-decoration: none; text-align: center; color: white; transition: 0.3s; }
         .btn-logout { background: #444; }
-        .btn-admin { background: #f39c12; display: none; }
+        .btn-admin { background: #f39c12; display: none; border: 2px solid rgba(255,255,255,0.1); }
+        .btn-admin:hover { background: #e67e22; transform: translateY(-2px); }
 
         h2 { text-align: center; margin: 10px 0 5px 0; text-transform: uppercase; }
         h4 { text-align: center; color: #888; font-weight: normal; margin-bottom: 25px; border-bottom: 1px solid #30475e; padding-bottom: 15px; }
@@ -37,7 +38,7 @@
 <div class="container">
     <div class="nav-bar">
         <a href="#" class="nav-btn btn-logout" onclick="logout()">Logout</a>
-        <a href="rekap.html" id="admin-link" class="nav-btn btn-admin">Panel Rekap</a>
+        <a href="rekap.html" id="admin-link" class="nav-btn btn-admin">Panel Rekap (Admin)</a>
     </div>
 
     <div id="dashboard-content">
@@ -96,16 +97,44 @@
 <script>
     const _supabase = window.supabase.createClient("https://urclmvdkfkfwvdascobs.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4");
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const discordId = urlParams.get('id');
-    const isAdmin = urlParams.get('admin') === 'true';
+    // --- LOGIKA PENYIMPANAN SESI (PENTING) ---
+    window.onload = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const discordId = urlParams.get('id');
+        const name = urlParams.get('name');
+        const rank = urlParams.get('pangkat');
+        const divisi = urlParams.get('divisi');
+        const isAdmin = urlParams.get('admin') === 'true';
 
-    if (!discordId) { window.location.href = "index.html"; }
+        // Jika tidak ada ID, tendang ke login
+        if (!discordId && !localStorage.getItem("discord_id")) { 
+            window.location.href = "index.html"; 
+            return;
+        }
 
-    // Load identitas awal dari URL
-    document.getElementById('name-display').innerText = decodeURIComponent(urlParams.get('name') || "Unknown");
-    document.getElementById('rank-display').innerText = `${decodeURIComponent(urlParams.get('pangkat') || "Unknown")} | ${decodeURIComponent(urlParams.get('divisi') || "-")}`;
-    if (isAdmin) document.getElementById('admin-link').style.display = 'block';
+        // Jika user baru datang dari redirect login (URL punya data)
+        if (discordId && name) {
+            localStorage.setItem("discord_id", discordId);
+            localStorage.setItem("nama_user", decodeURIComponent(name));
+            localStorage.setItem("pangkat", decodeURIComponent(rank || "Unknown"));
+            localStorage.setItem("divisi", decodeURIComponent(divisi || "-"));
+            localStorage.setItem("is_admin", isAdmin);
+            
+            // Bersihkan URL agar rapi
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
+        // Update UI Dashboard
+        document.getElementById('name-display').innerText = localStorage.getItem("nama_user");
+        document.getElementById('rank-display').innerText = `${localStorage.getItem("pangkat")} | ${localStorage.getItem("divisi")}`;
+        
+        // Tampilkan tombol rekap jika admin
+        if (localStorage.getItem("is_admin") === "true") {
+            document.getElementById('admin-link').style.display = 'block';
+        }
+        
+        toggleFormMode();
+    };
 
     function toggleFormMode() {
         const status = document.getElementById('status_absen').value;
@@ -127,35 +156,43 @@
             rangeSec.style.display = "none";
             const inputTgl = document.getElementById('tanggal_absen');
             if (status === "HADIR") {
-                inputTgl.max = today; inputTgl.removeAttribute('min');
+                inputTgl.max = today; 
+                inputTgl.removeAttribute('min');
                 hadirSec.style.display = "block";
                 fileInput.required = true;
             } else {
-                inputTgl.min = today; inputTgl.removeAttribute('max');
+                inputTgl.min = today; 
+                inputTgl.removeAttribute('max');
                 hadirSec.style.display = "none";
                 fileInput.required = false;
             }
         }
     }
 
-    function logout() { if (confirm("Logout?")) window.location.href = "index.html"; }
+    function logout() { 
+        if (confirm("Logout dan hapus sesi?")) {
+            localStorage.clear();
+            window.location.href = "index.html"; 
+        }
+    }
 
     document.getElementById('absensi-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = document.getElementById('btn-submit');
         const msg = document.getElementById('status-msg');
         const statusAbsen = document.getElementById('status_absen').value;
+        const discordId = localStorage.getItem("discord_id");
         
         btn.disabled = true;
         btn.innerText = "Memvalidasi Identitas...";
 
         try {
-            // 1. CEK IDENTITAS TERBARU (Update Otomatis Nama/Pangkat/Divisi)
+            // 1. CEK IDENTITAS TERBARU
             const { data: userUpdate, error: errUser } = await _supabase
                 .from('users_master').select('*').eq('discord_id', discordId).single();
             if (errUser) throw new Error("Gagal verifikasi data master.");
 
-            // 2. LOGIKA TANGGAL & FILTER HARI MINGGU
+            // 2. LOGIKA TANGGAL
             let dateList = [];
             if (statusAbsen === "CUTI") {
                 let dStart = new Date(document.getElementById('cuti_mulai').value);
@@ -169,9 +206,9 @@
                 dateList.push(tglVal);
             }
 
-            if (dateList.length === 0) throw new Error("Tidak ada tanggal valid (Hari Minggu dilewati).");
+            if (dateList.length === 0) throw new Error("Tidak ada tanggal valid.");
 
-            // 3. UPLOAD FOTO (Hadir Saja)
+            // 3. UPLOAD FOTO
             let imgUrl = "N/A";
             const file = document.getElementById('bukti_foto').files[0];
             if (statusAbsen === "HADIR" && file) {
@@ -181,7 +218,7 @@
                 imgUrl = _supabase.storage.from('bukti-absen').getPublicUrl(path).data.publicUrl;
             }
 
-            // 4. INSERT DATA KE DATABASE
+            // 4. INSERT DATA
             btn.innerText = "Mengirim Laporan...";
             const reports = dateList.map(d => ({
                 discord_id: discordId,
@@ -197,10 +234,7 @@
             const { error: errIns } = await _supabase.from('absensi_sapd').insert(reports);
             if (errIns) throw errIns;
 
-            // Update UI & Reset
-            document.getElementById('name-display').innerText = userUpdate.nama_anggota;
-            document.getElementById('rank-display').innerText = `${userUpdate.pangkat} | ${userUpdate.divisi}`;
-            msg.innerText = "✔ Berhasil! Hari Minggu otomatis dilewati.";
+            msg.innerText = "✔ Berhasil Terkirim!";
             msg.style.color = "#2ecc71";
             document.getElementById('absensi-form').reset();
             toggleFormMode();
@@ -213,8 +247,6 @@
             btn.innerText = "Kirim Laporan";
         }
     });
-
-    toggleFormMode();
 </script>
 </body>
 </html>
