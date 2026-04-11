@@ -1,5 +1,6 @@
 /**
- * DASHBOARD.JS - VERSI FINAL (FILTER MINGGU INI)
+ * DASHBOARD.JS - VERSI STABIL
+ * Filter: Senin s/d Sabtu (Sinkron dengan Rekap Admin)
  */
 
 const _supabase = window.supabase.createClient(
@@ -15,7 +16,7 @@ window.onload = async () => {
     const divisi = urlParams.get('divisi');
     const isAdmin = urlParams.get('admin') === 'true';
 
-    // Logika Sinkronisasi Data Saat Login
+    // Logika Sinkronisasi Data Saat Login (Fitur Utama)
     if (discordId && name) {
         localStorage.setItem("discord_id", discordId);
         localStorage.setItem("nama_user", decodeURIComponent(name));
@@ -46,9 +47,11 @@ window.onload = async () => {
 function updateUI() {
     document.getElementById('name-display').innerText = localStorage.getItem("nama_user");
     document.getElementById('rank-display').innerText = `${localStorage.getItem("pangkat")} | ${localStorage.getItem("divisi")}`;
-    if (localStorage.getItem("is_admin") === "true") {
-        const adminLink = document.getElementById('admin-link');
-        if(adminLink) adminLink.style.display = 'block';
+    
+    // Fitur Admin Link
+    const adminLink = document.getElementById('admin-link');
+    if (adminLink && localStorage.getItem("is_admin") === "true") {
+        adminLink.style.display = 'block';
     }
 }
 
@@ -56,22 +59,19 @@ async function updateGajiDisplay() {
     const discId = localStorage.getItem("discord_id");
     const pangkat = localStorage.getItem("pangkat");
     
+    // --- LOGIKA FILTER: SENIN s/d SABTU ---
     const sekarang = new Date();
-    const hari = sekarang.getDay(); // 0 = Minggu
+    const hariIni = sekarang.getDay(); // 0=Minggu, 1=Senin
 
-    // =========================
-    // HITUNG SENIN
-    // =========================
-    const selisihKeSenin = (hari === 0 ? -6 : 1 - hari);
+    // Cari tanggal Senin minggu ini
     const senin = new Date(sekarang);
+    const selisihKeSenin = (hariIni === 0 ? -6 : 1 - hariIni);
     senin.setDate(sekarang.getDate() + selisihKeSenin);
     senin.setHours(0, 0, 0, 0);
 
-    // =========================
-    // HITUNG SABTU
-    // =========================
+    // Cari tanggal Sabtu minggu ini
     const sabtu = new Date(senin);
-    sabtu.setDate(senin.getDate() + 5); // Senin + 5 = Sabtu
+    sabtu.setDate(senin.getDate() + 5); 
     sabtu.setHours(23, 59, 59, 999);
 
     try {
@@ -80,9 +80,9 @@ async function updateGajiDisplay() {
             .select('*')
             .eq('discord_id', discId)
             .gte('created_at', senin.toISOString())
-            .lte('created_at', sabtu.toISOString()) // ✅ FIX DI SINI
+            .lte('created_at', sabtu.toISOString())
             .order('created_at', { ascending: false });
-
+        
         if (error) throw error;
 
         const hariHadirUnik = new Set();
@@ -91,36 +91,36 @@ async function updateGajiDisplay() {
 
         if (logs) {
             logs.forEach(l => {
-                const tanggal = new Date(l.created_at).toISOString().split('T')[0];
+                const tglKey = new Date(l.created_at).toLocaleDateString('en-CA');
                 const status = (l.tipe_absen || "").toUpperCase();
 
-                if (status === "HADIR") {
-                    hariHadirUnik.add(tanggal);
-                } else if (status === "IZIN") {
-                    hariIzinUnik.add(tanggal);
-                } else if (status === "CUTI") {
-                    hariCutiUnik.add(tanggal);
-                }
+                if (status === "IZIN") hariIzinUnik.add(tglKey);
+                else if (status === "CUTI") hariCutiUnik.add(tglKey);
+                else if (status === "HADIR") hariHadirUnik.add(tglKey);
             });
         }
 
         const h = hariHadirUnik.size;
         const i = hariIzinUnik.size;
         const c = hariCutiUnik.size;
+        const totalAktif = h + i + c;
+        
+        // Alpa dihitung dari 6 hari kerja (Senin-Sabtu)
+        let a = Math.max(0, 6 - totalAktif);
 
-        const totalInput = h + i + c;
-        const a = Math.max(0, 6 - totalInput);
-
-        const hasil = hitungGajiMember(pangkat, h);
-
-        document.getElementById('gaji-val').innerText = `$${hasil.gajiAkhir.toLocaleString()}`;
+        // Integrasi dengan config.js
+        const hasilGaji = typeof hitungGajiMember === "function" 
+            ? hitungGajiMember(pangkat, h) 
+            : { gajiAkhir: 0 };
+        
+        document.getElementById('gaji-val').innerText = `$${hasilGaji.gajiAkhir.toLocaleString()}`;
         document.getElementById('stat-hadir').innerText = h;
         document.getElementById('stat-izin').innerText = i;
         document.getElementById('stat-cuti').innerText = c;
         document.getElementById('stat-alpa').innerText = a;
 
-    } catch (err) {
-        console.error("Gagal update stats:", err);
+    } catch (err) { 
+        console.error("Gagal sinkronisasi dashboard:", err); 
     }
 }
 
@@ -136,10 +136,6 @@ function toggleFormMode() {
     const cutiMulai = document.getElementById('cuti_mulai');
     const cutiSelesai = document.getElementById('cuti_selesai');
 
-    tglInput.value = ""; cutiMulai.value = ""; cutiSelesai.value = "";
-    tglInput.removeAttribute('min'); tglInput.removeAttribute('max');
-    cutiMulai.removeAttribute('min'); cutiSelesai.removeAttribute('min');
-
     if (status === "HADIR") {
         singleSec.style.display = "block"; rangeSec.style.display = "none"; hadirSec.style.display = "block";
         tglInput.max = today; tglInput.required = true; fileInput.required = true;
@@ -153,13 +149,6 @@ function toggleFormMode() {
     }
 }
 
-function logout() { 
-    if (confirm("Logout dan hapus sesi?")) {
-        localStorage.clear();
-        window.location.href = "index.html"; 
-    }
-}
-
 document.getElementById('absensi-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('btn-submit');
@@ -168,13 +157,9 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
     const discordId = localStorage.getItem("discord_id");
     
     btn.disabled = true;
-    btn.innerText = "Memverifikasi...";
+    btn.innerText = "Mengirim...";
 
     try {
-        const currentName = localStorage.getItem("nama_user");
-        const currentRank = localStorage.getItem("pangkat");
-        const currentDiv = localStorage.getItem("divisi");
-
         let dateList = [];
         if (statusAbsen === "CUTI") {
             let dStart = new Date(document.getElementById('cuti_mulai').value);
@@ -189,8 +174,6 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
             dateList.push(tglVal);
         }
 
-        if (dateList.length === 0) throw new Error("Pilih tanggal valid.");
-
         let imgUrl = "N/A";
         const file = document.getElementById('bukti_foto').files[0];
         if (statusAbsen === "HADIR" && file) {
@@ -200,17 +183,13 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
             imgUrl = _supabase.storage.from('bukti-absen').getPublicUrl(path).data.publicUrl;
         }
 
-        btn.innerText = "Mengirim...";
-        
         const reports = dateList.map(d => ({
             discord_id: discordId,
-            nama_anggota: currentName,
-            pangkat: currentRank,
-            divisi: currentDiv,
+            nama_anggota: localStorage.getItem("nama_user"),
+            pangkat: localStorage.getItem("pangkat"),
+            divisi: localStorage.getItem("divisi"),
             tipe_absen: statusAbsen, 
-            jam_duty: (statusAbsen === "HADIR") 
-                ? `${document.getElementById('jam_mulai').value} - ${document.getElementById('jam_selesai').value}` 
-                : null,
+            jam_duty: (statusAbsen === "HADIR") ? `${document.getElementById('jam_mulai').value} - ${document.getElementById('jam_selesai').value}` : null,
             alasan: document.getElementById('kegiatan').value,
             bukti_foto: imgUrl,
             created_at: d.toISOString()
@@ -222,22 +201,7 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
             body: JSON.stringify(reports)
         });
 
-        const result = await response.json();
-        if (response.status === 403) {
-            alert("AKSES DICABUT!");
-            localStorage.clear();
-            window.location.href = "index.html";
-            return;
-        }
-
-        if (response.status !== 200) throw new Error(result.message);
-
-        if (result.updatedData) {
-            localStorage.setItem("nama_user", result.updatedData.name || currentName);
-            localStorage.setItem("pangkat", result.updatedData.pangkat || currentRank);
-            localStorage.setItem("divisi", result.updatedData.divisi || currentDiv);
-            updateUI();
-        }
+        if (response.status !== 200) throw new Error("Gagal mengirim laporan.");
 
         msg.innerText = "✔ Berhasil dikirim!";
         msg.style.color = "#2ecc71";
@@ -253,3 +217,7 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
         btn.innerText = "Kirim Laporan";
     }
 });
+
+function logout() { 
+    if (confirm("Logout?")) { localStorage.clear(); window.location.href = "index.html"; }
+}
