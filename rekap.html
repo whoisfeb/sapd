@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>SAPD Admin - Rekap & Payroll</title>
+    <script src="config.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
@@ -15,12 +16,7 @@
         .action-buttons { display: flex; gap: 10px; }
         .card { background: var(--card); padding: 20px; border-radius: 10px; border-top: 4px solid var(--primary); overflow-x: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         
-        /* Tambahan Style untuk Global Salary */
-        .global-stats {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 15px;
-        }
+        .global-stats { display: flex; justify-content: flex-end; margin-bottom: 15px; }
         .salary-badge {
             background: rgba(46, 204, 113, 0.1);
             border: 1px solid var(--success);
@@ -30,8 +26,8 @@
             flex-direction: column;
             align-items: flex-end;
         }
-        .salary-badge span { font-size: 0.7em; color: #aaa; text-transform: uppercase; }
-        .salary-badge b { font-size: 1.4em; color: var(--success); }
+        .salary-badge span { font-size: 0.75em; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
+        .salary-badge b { font-size: 1.5em; color: var(--success); }
 
         table { width: 100%; border-collapse: collapse; font-size: 0.8em; min-width: 1100px; }
         th, td { border: 1px solid #30475e; padding: 12px 8px; text-align: center; }
@@ -110,9 +106,6 @@
 
     const _supabase = window.supabase.createClient("https://urclmvdkfkfwvdascobs.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4");
 
-    const RANK_ORDER = { "CHIEF OF POLICE": 1, "ASSISTANT CHIEF OF POLICE": 2, "DEPUTY CHIEF OF POLICE": 3, "COMMANDER": 4, "CAPTAIN III": 5, "CAPTAIN II": 6, "CAPTAIN I": 7, "LIEUTENANT III": 8, "LIEUTENANT II": 9, "LIEUTENANT I": 10, "SERGEANT III": 11, "SERGEANT II": 12, "SERGEANT I": 13, "DETECTIVE III": 14, "DETECTIVE II": 15, "DETECTIVE I": 16, "POLICE OFFICER III": 17, "POLICE OFFICER II": 18, "POLICE OFFICER I": 19, "CADET": 20 };
-    const BASE_SALARY = { "CHIEF OF POLICE": 80000, "ASSISTANT CHIEF OF POLICE": 76000, "DEPUTY CHIEF OF POLICE": 72000, "COMMANDER": 68000, "CAPTAIN III": 64000, "CAPTAIN II": 60000, "CAPTAIN I": 56000, "LIEUTENANT III": 52000, "LIEUTENANT II": 48000, "LIEUTENANT I": 45000, "SERGEANT III": 42000, "SERGEANT II": 40000, "SERGEANT I": 38000, "DETECTIVE III": 36000, "DETECTIVE II": 34000, "DETECTIVE I": 32000, "POLICE OFFICER III": 30000, "POLICE OFFICER II": 28000, "POLICE OFFICER I": 26000, "CADET": 24000 };
-
     let currentWeekOffset = 0;
     let userWeekly = {}; 
 
@@ -123,6 +116,7 @@
         const { data: logs } = await _supabase.from('absensi_sapd').select('*').gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
         const { data: masters } = await _supabase.from('users_master').select('*');
 
+        // Menggunakan RANK_ORDER dari config.js
         masters.sort((a, b) => (RANK_ORDER[a.pangkat.toUpperCase()] || 99) - (RANK_ORDER[b.pangkat.toUpperCase()] || 99));
 
         userWeekly = {}; 
@@ -139,15 +133,16 @@
             }
         });
 
-        let totalGajiSemua = 0; // Penampung Gaji Global
+        let totalGajiSemua = 0;
 
         document.getElementById('tbody-weekly').innerHTML = masters.map(m => {
             const u = userWeekly[m.discord_id];
-            const gajiPokok = BASE_SALARY[m.pangkat.toUpperCase()] || 0;
-            let totalGaji = (gajiPokok / 5) * Math.min(u.totalHadir, 5);
-            if (u.totalHadir >= 6) totalGaji += 10000;
+            
+            // Menggunakan fungsi hitungGajiMember dari config.js
+            const hasilGaji = hitungGajiMember(m.pangkat, u.totalHadir);
+            const totalGaji = hasilGaji.gajiAkhir;
 
-            totalGajiSemua += totalGaji; // Tambahkan ke hitungan global
+            totalGajiSemua += totalGaji;
 
             const cWarn = m.total_warning || 0;
             const getIcon = (idx) => {
@@ -166,7 +161,7 @@
                 <td>${m.pangkat}</td>
                 ${[1,2,3,4,5,6].map(i => `<td>${getIcon(i)}</td>`).join('')}
                 <td>${u.totalHadir}/6</td>
-                <td class="salary-text">$${Math.floor(totalGaji).toLocaleString()}</td>
+                <td class="salary-text">$${totalGaji.toLocaleString()}</td>
                 <td>
                     <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
                         <button class="btn-warning" onclick="sendWarning('${m.discord_id}', '${m.nama_anggota}', '${m.pangkat}', ${cWarn}, '${currentAdminName}', '${currentAdminRank}')">⚠️ Warning (${cWarn})</button>
@@ -177,8 +172,7 @@
             </tr>`;
         }).join('');
 
-        // Tampilkan Total Gaji Global
-        document.getElementById('total-gaji-global').innerText = `$${Math.floor(totalGajiSemua).toLocaleString()}`;
+        document.getElementById('total-gaji-global').innerText = `$${totalGajiSemua.toLocaleString()}`;
     }
 
     async function sendWarning(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank) {
@@ -264,7 +258,7 @@
         const ws = XLSX.utils.aoa_to_sheet(rows);
         ws['!cols'] = [{wch:25}, {wch:20}, {wch:8}, {wch:8}, {wch:8}, {wch:8}, {wch:8}, {wch:8}, {wch:8}, {wch:12}];
         const wb = XLSX.utils.book_new();
-        XLSUtils.book_append_sheet(wb, ws, "Rekap");
+        XLSX.utils.book_append_sheet(wb, ws, "Rekap");
         XLSX.writeFile(wb, `Rekap_SAPD.xlsx`);
     }
 
