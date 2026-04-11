@@ -1,9 +1,8 @@
 /**
- * REKAP.JS - FINAL PRODUCTION VERSION
- * Update: Mapping Column (Alasan & Waktu), Fix UI Popup Bug, Complete logic
+ * REKAP.JS - UPDATED VERSION
+ * Integrasi Fitur: Popup Detail, Alasan (log.alasan), Waktu (log.jam_duty), UI Fix
  */
 
-// 1. KEAMANAN AKSES (Admin Only)
 function checkAuth() {
     const isAdmin = localStorage.getItem("is_admin");
     if (isAdmin !== "true") {
@@ -15,38 +14,20 @@ function checkAuth() {
 }
 checkAuth();
 
-// 2. KONFIGURASI DATABASE
-const _supabase = window.supabase.createClient(
-    "https://urclmvdkfkfwvdascobs.supabase.co", 
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4"
-);
+const _supabase = window.supabase.createClient("https://knldblqwaumehhwaodmn.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtubGRibHF3YXVtZWhod2FvZG1uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4OTIwNzIsImV4cCI6MjA5MTM4NTMyNH0.EdMpVA8E4Vax8FCwJcKAJx-f-d80ysGWRsGLSAS_q3I");
 
 let currentWeekOffset = 0;
 let userWeekly = {}; 
 
-// 3. LOGIKA PENGAMBILAN DATA
 async function loadData() {
     const { mon, sun } = getWeekRange(currentWeekOffset);
     document.getElementById('label-minggu').innerText = `${mon.toLocaleDateString('id-ID')} - ${sun.toLocaleDateString('id-ID')}`;
 
-    // Ambil data absensi dan master user secara bersamaan
-    const [resLogs, resMasters] = await Promise.all([
-        _supabase.from('absensi_sapd').select('*').gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString()),
-        _supabase.from('users_master').select('*')
-    ]);
+    const { data: logs } = await _supabase.from('absensi_sasg').select('*').gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+    const { data: masters } = await _supabase.from('users_master').select('*');
 
-    if (resLogs.error || resMasters.error) {
-        console.error("Gagal mengambil data database");
-        return;
-    }
-
-    const logs = resLogs.data;
-    const masters = resMasters.data;
-
-    // Urutkan berdasarkan Pangkat (RANK_ORDER harus ada di config.js)
     masters.sort((a, b) => (RANK_ORDER[a.pangkat.toUpperCase()] || 99) - (RANK_ORDER[b.pangkat.toUpperCase()] || 99));
 
-    // Reset dan Inisialisasi Data Weekly
     userWeekly = {}; 
     masters.forEach(m => {
         userWeekly[m.discord_id] = { 
@@ -57,118 +38,118 @@ async function loadData() {
         };
     });
 
-    // Proses Log Absensi
     logs.forEach(log => {
         const d = new Date(log.created_at).getDay();
         const dateKey = new Date(log.created_at).toISOString().split('T')[0];
         const discordId = log.discord_id;
 
-        // Skip jika hari Minggu (0) atau user tidak ada di master
         if (userWeekly[discordId] && d !== 0) {
             const ketAsli = (log.jam_duty || "").toUpperCase();
             const status = ketAsli.includes("IZIN") ? "IZIN" : (ketAsli.includes("CUTI") ? "CUTI" : "HADIR");
 
+            // FITUR BARU: Mapping detail untuk Popup
             userWeekly[discordId].days[d] = { 
-                alasan: log.alasan || "-",         // AMBIL DARI KOLOM ALASAN
-                waktuDuty: log.jam_duty || "-",    // AMBIL DARI KOLOM JAM_DUTY
-                bukti: log.bukti_foto,
+                status: status,
+                ket: ketAsli,
+                alasan: log.alasan || "-", // Ambil dari row alasan
+                waktuDuty: log.jam_duty || "-", // Ambil dari jam_duty
+                bukti: log.bukti_foto || log.bukti_gambar,
                 tanggalLog: new Date(log.created_at).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' }),
-                divisi: userWeekly[discordId].info.divisi || "-",
-                status: status
+                divisi: userWeekly[discordId].info.divisi || "-"
             };
 
-            // Hitung kehadiran (Hanya jika status HADIR dan belum tercatat di tanggal tersebut)
-            if (status === "HADIR" && !userWeekly[discordId].uniqueDates.has(dateKey)) {
-                userWeekly[discordId].totalHadir++; 
-                userWeekly[discordId].uniqueDates.add(dateKey); 
+            if (status === "HADIR") {
+                if (!userWeekly[discordId].uniqueDates.has(dateKey)) {
+                    userWeekly[discordId].totalHadir++; 
+                    userWeekly[discordId].uniqueDates.add(dateKey); 
+                }
             }
         }
     });
 
-    renderTable(masters);
-}
+    let totalGajiSemua = 0;
+    const currentAdminName = localStorage.getItem("nama_user");
+    const currentAdminRank = localStorage.getItem("pangkat");
 
-// 4. RENDER TABEL UTAMA
-function renderTable(masters) {
-    let totalGajiGlobal = 0;
-    const tbody = document.getElementById('tbody-weekly');
-    
-    tbody.innerHTML = masters.map(m => {
+    document.getElementById('tbody-weekly').innerHTML = masters.map(m => {
         const u = userWeekly[m.discord_id];
-        // Fungsi hitungGajiMember berasal dari config.js
-        const hasilGaji = hitungGajiMember(m.pangkat, u.totalHadir); 
-        totalGajiGlobal += hasilGaji.gajiAkhir;
+        const hasilGaji = hitungGajiMember(m.pangkat, u.totalHadir);
+        const totalGaji = hasilGaji.gajiAkhir;
+        totalGajiSemua += totalGaji;
 
+        const cWarn = m.total_warning || 0;
+        
         const getIcon = (idx) => {
             const data = u.days[idx];
             if (!data) return `<span class="cross-icon">✘</span>`;
             
-            const iconClass = (data.status === "HADIR") ? "check-icon" : "status-ic";
-            const label = (data.status === "HADIR") ? "✔" : (data.status === "IZIN" ? "I" : "C");
-            
-            // Konversi objek data ke string untuk dikirim ke popup
+            let label = "✔";
+            let iconClass = "check-icon";
+            if (data.status === "IZIN") { label = "I"; iconClass = "status-ic"; }
+            if (data.status === "CUTI") { label = "C"; iconClass = "status-ic"; }
+
+            // FITUR BARU: Klik icon untuk buka popup detail
             const dataStr = JSON.stringify(data).replace(/"/g, '&quot;');
             return `<span class="${iconClass}" style="cursor:pointer;" onclick="openDetailPopup('${m.nama_anggota}', '${m.pangkat}', ${dataStr})">${label}</span>`;
         };
 
-        return `
-        <tr>
+        return `<tr>
             <td style="text-align:left;"><b>${m.nama_anggota}</b></td>
             <td>${m.pangkat}</td>
-            ${[1, 2, 3, 4, 5, 6].map(i => `<td>${getIcon(i)}</td>`).join('')}
+            ${[1,2,3,4,5,6].map(i => `<td>${getIcon(i)}</td>`).join('')}
             <td>${u.totalHadir}/6</td>
-            <td class="salary-text">$${hasilGaji.gajiAkhir.toLocaleString()}</td>
+            <td class="salary-text">$${totalGaji.toLocaleString()}</td>
             <td>
-                <button class="btn-warning" onclick="sendWarning('${m.discord_id}', '${m.nama_anggota}', '${m.pangkat}', ${m.total_warning || 0})">⚠️ (${m.total_warning || 0})</button>
+                <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
+                    <button class="btn-warning" onclick="sendWarning('${m.discord_id}', '${m.nama_anggota}', '${m.pangkat}', ${cWarn}, '${currentAdminName}', '${currentAdminRank}')">⚠️ Warning (${cWarn})</button>
+                    ${cWarn > 0 ? `<span class="unwarn-link" onclick="removeWarning('${m.discord_id}', '${m.nama_anggota}', '${m.pangkat}', ${cWarn}, '${currentAdminName}', '${currentAdminRank}')">[ Cabut SP ]</span>` : ''}
+                </div>
             </td>
             <td><button onclick="resetUser('${m.discord_id}')" style="background:none;border:none;cursor:pointer;">🗑</button></td>
         </tr>`;
     }).join('');
 
-    document.getElementById('total-gaji-global').innerText = `$${totalGajiGlobal.toLocaleString()}`;
+    document.getElementById('total-gaji-global').innerText = `$${totalGajiSemua.toLocaleString()}`;
 }
 
-// 5. MODAL POPUP DETAIL (PERBAIKAN TAMPILAN)
+// --- FITUR BARU: POPUP DETAIL DENGAN FIX LAYOUT ---
 function openDetailPopup(nama, pangkat, data) {
     const modal = document.getElementById('modal-detail');
     const content = document.getElementById('detail-content');
     
-    // Pastikan area konten bisa di-scroll jika terlalu panjang
-    content.style.maxHeight = "85vh";
+    content.style.maxHeight = "80vh";
     content.style.overflowY = "auto";
 
     content.innerHTML = `
         <div style="color: #eee; font-family: 'Segoe UI', sans-serif; padding: 5px;">
-            <h3 style="text-align:center; border-bottom: 2px solid #00adb5; padding-bottom: 10px; margin-bottom: 15px; color:#00adb5; letter-spacing: 1px;">DETAIL ABSENSI</h3>
+            <h3 style="text-align:center; border-bottom: 2px solid #00adb5; padding-bottom: 10px; margin-bottom: 15px; color:#00adb5;">DETAIL ABSENSI</h3>
             
             <style>
-                .popup-row { display: flex; margin-bottom: 12px; line-height: 1.5; border-bottom: 1px solid #333; padding-bottom: 8px; align-items: flex-start; }
-                .popup-label { width: 100px; color: #00adb5; font-weight: bold; flex-shrink: 0; font-size: 14px; }
-                .popup-colon { width: 20px; flex-shrink: 0; text-align: center; }
-                .popup-value { flex-grow: 1; word-break: break-word; overflow-wrap: anywhere; font-size: 14px; }
+                .pop-row { display: flex; margin-bottom: 10px; line-height: 1.4; border-bottom: 1px solid #333; padding-bottom: 5px; }
+                .pop-label { width: 100px; color: #00adb5; font-weight: bold; flex-shrink: 0; }
+                .pop-colon { width: 20px; flex-shrink: 0; text-align: center; }
+                .pop-val { flex-grow: 1; word-break: break-word; overflow-wrap: anywhere; }
             </style>
 
-            <div class="popup-row"><div class="popup-label">Nama</div><div class="popup-colon">:</div><div class="popup-value">${nama}</div></div>
-            <div class="popup-row"><div class="popup-label">Pangkat</div><div class="popup-colon">:</div><div class="popup-value">${pangkat}</div></div>
-            <div class="popup-row"><div class="popup-label">Divisi</div><div class="popup-colon">:</div><div class="popup-value">${data.divisi}</div></div>
-            <div class="popup-row"><div class="popup-label">Hari</div><div class="popup-colon">:</div><div class="popup-value">${data.tanggalLog}</div></div>
-            <div class="popup-row"><div class="popup-label">Waktu</div><div class="popup-colon">:</div><div class="popup-value">${data.waktuDuty}</div></div>
-            <div class="popup-row">
-                <div class="popup-label">Status</div><div class="popup-colon">:</div>
-                <div class="popup-value">
-                    <span style="background:#00adb5; color:#000; padding:2px 10px; border-radius:4px; font-weight:bold; font-size:12px;">${data.status}</span>
-                </div>
+            <div class="pop-row"><div class="pop-label">Nama</div><div class="pop-colon">:</div><div class="pop-val">${nama}</div></div>
+            <div class="pop-row"><div class="pop-label">Pangkat</div><div class="pop-colon">:</div><div class="pop-val">${pangkat}</div></div>
+            <div class="pop-row"><div class="pop-label">Divisi</div><div class="pop-colon">:</div><div class="pop-val">${data.divisi}</div></div>
+            <div class="pop-row"><div class="pop-label">Hari</div><div class="pop-colon">:</div><div class="pop-val">${data.tanggalLog}</div></div>
+            <div class="pop-row"><div class="pop-label">Waktu</div><div class="pop-colon">:</div><div class="pop-val">${data.waktuDuty}</div></div>
+            <div class="pop-row">
+                <div class="pop-label">Status</div><div class="pop-colon">:</div>
+                <div class="pop-val"><span style="background:#00adb5; color:#000; padding:2px 8px; border-radius:4px; font-weight:bold; font-size:11px;">${data.status}</span></div>
             </div>
-            <div class="popup-row" style="border-bottom:none;">
-                <div class="popup-label">Alasan</div><div class="popup-colon">:</div>
-                <div class="popup-value" style="font-style:italic; color:#00adb5;">${data.alasan}</div>
+            <div class="pop-row" style="border-bottom:none;">
+                <div class="pop-label">Alasan</div><div class="pop-colon">:</div>
+                <div class="pop-val" style="font-style:italic; color:#bbb;">${data.alasan}</div>
             </div>
 
             <div style="margin-top:20px;">
-                <p style="color:#00adb5; font-weight:bold; margin-bottom:10px; border-top: 1px solid #444; padding-top:10px; font-size: 14px;">Bukti Gambar:</p>
+                <p style="color:#00adb5; font-weight:bold; margin-bottom:10px; border-top: 1px solid #444; padding-top:10px;">Bukti Gambar:</p>
                 ${data.bukti ? 
-                    `<img src="${data.bukti}" style="width:100%; border-radius:8px; border:2px solid #30475e; box-shadow: 0 4px 15px rgba(0,0,0,0.5); cursor: pointer;" onclick="window.open('${data.bukti}', '_blank')">` : 
-                    `<div style="padding:30px; text-align:center; background:#1a1a1a; border-radius:8px; color:#555; border: 1px dashed #444;">Tidak ada bukti gambar.</div>`
+                    `<img src="${data.bukti}" style="width:100%; border-radius:8px; border:2px solid #30475e; box-shadow: 0 4px 15px rgba(0,0,0,0.5);" onclick="window.open('${data.bukti}', '_blank')">` : 
+                    `<div style="padding:20px; text-align:center; background:#222831; border-radius:8px; color:#666;">Tidak ada bukti gambar.</div>`
                 }
             </div>
         </div>
@@ -180,13 +161,121 @@ function closeDetailPopup() {
     document.getElementById('modal-detail').style.display = "none";
 }
 
-// Menutup modal jika user klik area gelap (background)
+// Tutup popup jika klik di luar area modal
 window.onclick = function(event) {
     const modal = document.getElementById('modal-detail');
     if (event.target == modal) closeDetailPopup();
 }
 
-// 6. FUNGSI UTILITAS (WAKTU & RESET)
+// --- FITUR WARNING & LAINNYA (TIDAK BERUBAH) ---
+
+async function sendWarning(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank) {
+    if (!confirm(`Kirim SP-${currentWarn + 1} ke Discord?\n(Oleh: ${adminName} - ${adminRank})`)) return;
+    
+    const { mon } = getWeekRange(currentWeekOffset);
+    const u = userWeekly[discord_id];
+    const daftarBolos = [];
+    const hari = ["", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    for(let i=1; i<=6; i++) { 
+        if(!u.days[i]) { 
+            const t=new Date(mon); t.setDate(mon.getDate()+(i-1)); 
+            daftarBolos.push(`- ${hari[i]}, ${t.toLocaleDateString('id-ID')}`); 
+        } 
+    }
+
+    const newWarnCount = currentWarn + 1;
+    const logPayload = {
+        "content": "@everyone <@&1444908462067945623>",
+        "embeds": [{
+            "title": `📋 SURAT PERINGATAN (SP - ${newWarnCount})`,
+            "color": 15285324,
+            "description": `**Tanggal:** ${new Date().toLocaleDateString('id-ID')}\n**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat:** ${pangkat_anggota}\n\n**Alasan Peringatan:**\nTidak memenuhi syarat kehadiran mingguan.\nDetail Bolos:\n${daftarBolos.join('\n')}\n**Total SP:** ${newWarnCount}\n\n**Pemberi Peringatan:** ${adminName}\n**Pangkat:** ${adminRank}`,
+            "timestamp": new Date()
+        }]
+    };
+
+    await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
+    const res = await fetch('/.netlify/functions/send-warning', { 
+        method: 'POST', 
+        body: JSON.stringify({ payload: logPayload, updateList: await updateDiscordList() }) 
+    });
+    if (res.ok) { alert("SP Terkirim!"); loadData(); }
+}
+
+async function removeWarning(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank) {
+    if (!confirm(`Cabut SP untuk ${nama_anggota}?\n(Oleh: ${adminName} - ${adminRank})`)) return;
+    const newWarnCount = Math.max(0, currentWarn - 1);
+
+    const logPayload = {
+        "content": "<@&1444908462067945623>",
+        "embeds": [{
+            "title": `🔓 PENCABUTAN SURAT PERINGATAN`,
+            "color": 3066993,
+            "description": `**Tanggal:** ${new Date().toLocaleDateString('id-ID')}\n**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat Anggota:** ${pangkat_anggota}\n\n**Status:** 1 SP telah dicabut.\n**Sisa SP:** ${newWarnCount}\n\n**Dicabut Oleh:** ${adminName}\n**Pangkat Admin:** ${adminRank}`,
+            "timestamp": new Date()
+        }]
+    };
+
+    await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
+    const res = await fetch('/.netlify/functions/send-warning', { 
+        method: 'POST', 
+        body: JSON.stringify({ payload: logPayload, updateList: await updateDiscordList() }) 
+    });
+    if (res.ok) { alert("SP Berhasil dicabut!"); loadData(); }
+}
+
+async function updateDiscordList() {
+    const { data: masters } = await _supabase.from('users_master').select('*');
+    masters.sort((a, b) => (RANK_ORDER[a.pangkat.toUpperCase()] || 99) - (RANK_ORDER[b.pangkat.toUpperCase()] || 99));
+    let txt = "## 📊 DAFTAR TOTAL WARNING ANGGOTA SAPD\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
+    masters.forEach(m => {
+        const emoji = m.total_warning >= 3 ? "🔴" : (m.total_warning > 0 ? "🟡" : "🟢");
+        txt += `${emoji} ${m.nama_anggota} (<@${m.discord_id}>) : \`${m.total_warning || 0} SP\`\n`;
+    });
+    return txt.substring(0, 1990);
+}
+
+function downloadExcel() {
+    const rows = [["Nama Anggota", "Pangkat", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Total", "Gaji"]];
+    document.querySelectorAll("#tbody-weekly tr").forEach(tr => {
+        const rowData = [];
+        tr.querySelectorAll("td").forEach((td, i) => {
+            if(i < 10) {
+                let val = td.innerText.trim();
+                if(td.querySelector(".check-icon")) val = "HADIR";
+                else if(td.querySelector(".cross-icon")) val = "ALPA";
+                rowData.push(val);
+            }
+        });
+        rows.push(rowData);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{wch:25}, {wch:20}, {wch:8}, {wch:8}, {wch:8}, {wch:8}, {wch:8}, {wch:8}, {wch:8}, {wch:12}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Rekap");
+    XLSX.writeFile(wb, `Rekap_SAPD.xlsx`);
+}
+
+function downloadPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('l', 'mm', 'a4');
+    doc.autoTable({
+        html: '#table-rekap',
+        columns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        theme: 'grid',
+        styles: { fontSize: 8, lineWidth: 0.1, lineColor: [48, 71, 94] },
+        didParseCell: function(data) {
+            if (data.cell.section === 'body') {
+                const txt = data.cell.raw.innerText;
+                if (txt === '✔') { data.cell.styles.fillColor = [39, 174, 96]; data.cell.styles.textColor = 255; }
+                else if (txt === 'I' || txt === 'C') { data.cell.styles.fillColor = [243, 156, 18]; data.cell.styles.textColor = 255; }
+                else if (txt === '✘') { data.cell.styles.fillColor = [233, 69, 96]; data.cell.styles.textColor = 255; }
+            }
+        }
+    });
+    doc.save(`Rekap_SAPD.pdf`);
+}
+
 function getWeekRange(offset = 0) {
     const now = new Date(); now.setDate(now.getDate() + (offset * 7));
     const day = now.getDay(); const diff = now.getDate() - day + (day === 0 ? -6 : 1);
@@ -196,19 +285,36 @@ function getWeekRange(offset = 0) {
 }
 
 async function resetUser(id) {
-    if (!confirm("Peringatan: Hapus data absensi anggota ini untuk minggu yang dipilih?")) return;
+    if (!confirm("Hapus data absensi & bukti gambar anggota ini di minggu ini?")) return;
     const { mon, sun } = getWeekRange(currentWeekOffset);
-    await _supabase.from('absensi_sapd').delete()
-        .eq('discord_id', id)
-        .gte('created_at', mon.toISOString())
-        .lte('created_at', sun.toISOString());
+    
+    const { data: logs } = await _supabase.from('absensi_sapd').select('bukti_gambar').eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+    if (logs && logs.length > 0) {
+        const filesToRemove = logs.map(log => log.bukti_gambar ? `absensi/${log.bukti_gambar}` : null).filter(path => path !== null);
+        if (filesToRemove.length > 0) {
+            await _supabase.storage.from('bukti-absen').remove(filesToRemove);
+        }
+    }
+
+    await _supabase.from('absensi_sapd').delete().eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+    alert("Data dan Gambar berhasil dihapus!");
     loadData();
 }
 
-function changeWeek(dir) { 
-    currentWeekOffset += dir; 
-    loadData(); 
+async function resetAllWeeklyData() {
+    if (!confirm("Hapus SEMUA data absensi & bukti gambar minggu ini?")) return;
+    const { mon, sun } = getWeekRange(currentWeekOffset);
+    const { data: allLogs } = await _supabase.from('absensi_sapd').select('bukti_gambar').gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+    if (allLogs && allLogs.length > 0) {
+        const filesToRemove = allLogs.map(log => log.bukti_gambar ? `absensi/${log.bukti_gambar}` : null).filter(path => path !== null);
+        if (filesToRemove.length > 0) {
+            await _supabase.storage.from('bukti-absen').remove(filesToRemove);
+        }
+    }
+    await _supabase.from('absensi_sapd').delete().gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+    alert("Seluruh data minggu ini telah dibersihkan!");
+    loadData();
 }
 
-// Jalankan aplikasi pertama kali
+function changeWeek(dir) { currentWeekOffset += dir; loadData(); }
 loadData();
