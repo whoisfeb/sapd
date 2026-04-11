@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <style>
-        :root { --primary: #e94560; --bg: #1a1a2e; --card: #16213e; --text: #ffffff; --success: #2ecc71; }
+        :root { --primary: #e94560; --bg: #1a1a2e; --card: #16213e; --text: #ffffff; --success: #2ecc71; --warning: #f1c40f; --danger: #e74c3c; --info: #3498db; }
         body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
         
         .container { background: var(--card); padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; max-width: 450px; border-top: 5px solid var(--primary); }
@@ -18,19 +18,27 @@
         .btn-admin { background: #f39c12; display: none; border: 2px solid rgba(255,255,255,0.1); }
         .btn-admin:hover { background: #e67e22; transform: translateY(-2px); }
 
-        /* Style Baru Box Gaji */
+        /* Style Box Gaji & Statistik Detail */
         .salary-box {
             background: rgba(255, 255, 255, 0.05);
             padding: 15px;
             border-radius: 10px;
             margin-bottom: 20px;
             border-left: 4px solid var(--success);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
         }
-        .salary-info div { font-size: 0.75em; color: #aaa; margin-bottom: 2px; }
-        .salary-amount { font-size: 1.2em; font-weight: bold; color: var(--success); }
+        .salary-main { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .salary-title { font-size: 0.75em; color: #aaa; }
+        .salary-amount { font-size: 1.3em; font-weight: bold; color: var(--success); }
+        
+        .stats-detail { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px; }
+        .stat-card { text-align: center; }
+        .stat-num { display: block; font-weight: bold; font-size: 1.1em; }
+        .stat-label { font-size: 0.6em; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        .c-hadir { color: var(--success); }
+        .c-izin { color: var(--warning); }
+        .c-cuti { color: var(--info); }
+        .c-alpa { color: var(--danger); }
 
         h2 { text-align: center; margin: 10px 0 5px 0; text-transform: uppercase; }
         h4 { text-align: center; color: #888; font-weight: normal; margin-bottom: 25px; border-bottom: 1px solid #30475e; padding-bottom: 15px; }
@@ -61,11 +69,28 @@
         <h4 id="rank-display">Pangkat | Divisi</h4>
 
         <div class="salary-box">
-            <div class="salary-info">
-                <div>Estimasi Gaji Minggu Ini</div>
-                <div id="hadir-count">Hadir: 0/6 Hari</div>
+            <div class="salary-main">
+                <div class="salary-title">Estimasi Gaji Minggu Ini</div>
+                <div class="salary-amount" id="gaji-val">$0</div>
             </div>
-            <div class="salary-amount" id="gaji-val">$0</div>
+            <div class="stats-detail">
+                <div class="stat-card">
+                    <span class="stat-num c-hadir" id="stat-hadir">0</span>
+                    <span class="stat-label">Hadir</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-num c-izin" id="stat-izin">0</span>
+                    <span class="stat-label">Izin</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-num c-cuti" id="stat-cuti">0</span>
+                    <span class="stat-label">Cuti</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-num c-alpa" id="stat-alpa">0</span>
+                    <span class="stat-label">Alpa</span>
+                </div>
+            </div>
         </div>
 
         <form id="absensi-form">
@@ -144,7 +169,7 @@
 
         updateUI();
         toggleFormMode();
-        updateGajiDisplay(); // Ambil data gaji saat load
+        updateGajiDisplay(); 
     };
 
     function updateUI() {
@@ -155,12 +180,10 @@
         }
     }
 
-    // Fungsi Hitung Gaji Personal
     async function updateGajiDisplay() {
         const discId = localStorage.getItem("discord_id");
         const pangkat = localStorage.getItem("pangkat");
         
-        // Cari Senin minggu ini
         const d = new Date();
         const day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6:1);
         const monday = new Date(d.setDate(diff));
@@ -169,18 +192,27 @@
         try {
             const { data: logs } = await _supabase.from('absensi_sapd').select('jam_duty').eq('discord_id', discId).gte('created_at', monday.toISOString());
             
-            let hadir = 0;
+            let h = 0, i = 0, c = 0;
             if (logs) {
                 logs.forEach(l => {
                     const ket = (l.jam_duty || "").toUpperCase();
-                    if (!ket.includes("IZIN") && !ket.includes("CUTI")) hadir++;
+                    if (ket.includes("IZIN")) i++;
+                    else if (ket.includes("CUTI")) c++;
+                    else h++;
                 });
             }
 
-            const hasil = hitungGajiMember(pangkat, hadir);
-            document.getElementById('hadir-count').innerText = `Hadir: ${hadir}/6 Hari`;
+            // Hitung Alpa: Kewajiban 6 hari (Senin-Sabtu) - (Hadir+Izin+Cuti)
+            let a = Math.max(0, 6 - (h + i + c));
+
+            const hasil = hitungGajiMember(pangkat, h);
+            
             document.getElementById('gaji-val').innerText = `$${hasil.gajiAkhir.toLocaleString()}`;
-        } catch (err) { console.error(err); }
+            document.getElementById('stat-hadir').innerText = h;
+            document.getElementById('stat-izin').innerText = i;
+            document.getElementById('stat-cuti').innerText = c;
+            document.getElementById('stat-alpa').innerText = a;
+        } catch (err) { console.error("Gagal update stats:", err); }
     }
 
     function toggleFormMode() {
@@ -290,7 +322,6 @@
             document.getElementById('absensi-form').reset();
             toggleFormMode();
             
-            // Update Gaji setelah berhasil kirim
             updateGajiDisplay();
 
         } catch (err) {
