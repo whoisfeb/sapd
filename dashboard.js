@@ -65,7 +65,7 @@ async function updateGajiDisplay() {
     try {
         // Ambil data dari awal minggu sampai sekarang
         const { data: logs } = await _supabase
-            .from('absensi_sasg')
+            .from('absensi_sapd')
             .select('jam_duty, created_at')
             .eq('discord_id', discId)
             .gte('created_at', monday.toISOString());
