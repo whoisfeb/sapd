@@ -34,7 +34,6 @@ exports.handler = async (event) => {
         "1444920482578173953": "CADET"
     };
 
-    // URUTAN PANGKAT (DARI TERTINGGI KE TERENDAH)
     const PANGKAT_PRIORITY = [
         "1444909938001580257", "1444909771181522974", "1444909625475596349",
         "1444908730230771723", "1444918644600606770", "1444918698484826173",
@@ -54,7 +53,6 @@ exports.handler = async (event) => {
     };
 
     try {
-        // 1. CEK ROLE REAL-TIME
         const memberRes = await axios.get(
             `https://discord.com/api/v10/guilds/${process.env.DISCORD_GUILD_ID}/members/${discordId}`,
             { headers: { Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}` } }
@@ -68,16 +66,14 @@ exports.handler = async (event) => {
             return { statusCode: 403, body: JSON.stringify({ message: "KICKED" }) };
         }
 
-        // 2. DETEKSI PANGKAT BERDASARKAN PRIORITAS (HIGHEST FIRST)
         let freshPangkat = "Unknown";
         for (const roleId of PANGKAT_PRIORITY) {
             if (roles.includes(roleId)) {
                 freshPangkat = PANGKAT_MAP[roleId];
-                break; // Stop jika sudah ketemu pangkat tertinggi
+                break;
             }
         }
 
-        // Deteksi Divisi
         let freshDivisi = "-";
         roles.forEach(r => {
             if (DIVISI_MAP[r]) freshDivisi = DIVISI_MAP[r];
@@ -85,14 +81,22 @@ exports.handler = async (event) => {
 
         const freshName = nick || discordUser.global_name || discordUser.username;
 
-        // Update Tabel Master
+        // 1. UPDATE TABEL MASTER (Identitas Utama)
         await supabase.from('users_master').update({
             nama_anggota: freshName,
             pangkat: freshPangkat,
             divisi: freshDivisi
         }).eq('discord_id', discordId);
 
-        // 3. INSERT ABSENSI
+        // 2. UPDATE SEMUA DATA LAMA DI TABEL ABSENSI (Sinkronisasi Massal)
+        // Bagian ini akan mencari semua baris dengan discord_id yang sama dan mengubah identitasnya
+        await supabase.from('absensi_sapd').update({
+            nama_anggota: freshName,
+            pangkat: freshPangkat,
+            divisi: freshDivisi
+        }).eq('discord_id', discordId);
+
+        // 3. INSERT DATA ABSENSI BARU
         const { error: insertError } = await supabase.from('absensi_sapd').insert(
             reports.map(r => ({
                 discord_id: discordId,
