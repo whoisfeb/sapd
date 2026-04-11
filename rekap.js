@@ -111,32 +111,58 @@ function checkAuth() {
     }
 
     // FUNGSI UNTUK MENAMPILKAN POPUP GAMBAR
-    function showImagePopup(images) {
-        let modal = document.getElementById("imageModal");
-        if (!modal) {
-            modal = document.createElement("div");
-            modal.id = "imageModal";
-            modal.innerHTML = `
-                <div style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10000; display:flex; justify-content:center; align-items:center;">
-                    <div style="background:#1a1a2e; padding:20px; border-radius:10px; max-width:90%; max-height:90%; overflow-y:auto; position:relative; border:2px solid #30475e;">
-                        <button onclick="document.getElementById('imageModal').remove()" style="position:absolute; top:10px; right:10px; background:#e94562; color:white; border:none; cursor:pointer; padding:5px 12px; border-radius:5px; font-weight:bold;">TUTUP</button>
-                        <h3 style="color:white; margin-bottom:15px; border-bottom:1px solid #30475e; padding-bottom:10px;">Bukti Dokumentasi</h3>
-                        <div id="modalContent" style="display:flex; flex-wrap:wrap; gap:15px; justify-content:center;"></div>
-                    </div>
-                </div>`;
-            document.body.appendChild(modal);
-        }
-
-        const content = document.getElementById("modalContent");
-        content.innerHTML = images.map(img => `
-            <div style="text-align:center;">
-                <img src="https://urclmvdkfkfwvdascobs.supabase.co/storage/v1/object/public/bukti-absen/absensi/${img}" 
-                     style="max-width:350px; width:100%; border-radius:5px; border:1px solid #0f3460;">
-                <br>
-                <a href="https://urclmvdkfkfwvdascobs.supabase.co/storage/v1/object/public/bukti-absen/absensi/${img}" target="_blank" style="color:#00d2ff; font-size:12px; text-decoration:none;">Buka Full Size</a>
-            </div>
-        `).join('');
+    // PASTIKAN FUNGSI INI DI LUAR loadData()
+function showImagePopup(images) {
+    if (!images || images.length === 0) {
+        alert("Tidak ada bukti gambar untuk hari ini.");
+        return;
     }
+
+    let modal = document.getElementById("imageModal");
+    
+    // Jika modal belum ada di DOM, buat baru
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "imageModal";
+        document.body.appendChild(modal);
+    }
+
+    // Isi konten modal
+    modal.innerHTML = `
+        <div style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:10000; display:flex; justify-content:center; align-items:center;">
+            <div style="background:#16213e; padding:25px; border-radius:12px; max-width:85%; max-height:85%; overflow-y:auto; position:relative; border:2px solid #e94560; box-shadow: 0 0 20px rgba(0,0,0,0.5);">
+                <button onclick="document.getElementById('imageModal').remove()" 
+                        style="position:absolute; top:15px; right:15px; background:#e94560; color:white; border:none; cursor:pointer; padding:8px 15px; border-radius:5px; font-weight:bold; z-index:11">
+                    TUTUP (ESC)
+                </button>
+                <h3 style="color:white; margin-top:0; margin-bottom:20px; border-bottom:2px solid #30475e; padding-bottom:10px; font-family: 'Segoe UI', sans-serif;">
+                    📸 Bukti Dokumentasi
+                </h3>
+                <div id="modalContent" style="display:flex; flex-wrap:wrap; gap:20px; justify-content:center;">
+                    ${images.map(img => `
+                        <div style="text-align:center; background:#1a1a2e; padding:10px; border-radius:8px;">
+                            <img src="https://urclmvdkfkfwvdascobs.supabase.co/storage/v1/object/public/bukti-absen/absensi/${img}" 
+                                 style="max-width:400px; width:100%; border-radius:5px; display:block; margin-bottom:10px;">
+                            <a href="https://urclmvdkfkfwvdascobs.supabase.co/storage/v1/object/public/bukti-absen/absensi/${img}" 
+                               target="_blank" 
+                               style="color:#00d2ff; font-size:12px; text-decoration:none; font-weight:bold;">
+                               🔗 Buka Ukuran Penuh
+                            </a>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>`;
+
+    // Tambahkan fitur tutup dengan tombol ESC
+    const handleEsc = (e) => {
+        if (e.key === "Escape") {
+            modal.remove();
+            document.removeEventListener("keydown", handleEsc);
+        }
+    };
+    document.addEventListener("keydown", handleEsc);
+}
 
     async function sendWarning(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank) {
         if (!confirm(`Kirim SP-${currentWarn + 1} ke Discord?\n(Oleh: ${adminName} - ${adminRank})`)) return;
