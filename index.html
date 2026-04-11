@@ -31,8 +31,9 @@
             max-width: 400px;
             width: 90%;
         }
-        h1 { margin-bottom: 10px; letter-spacing: 2px; }
+        h1 { margin-bottom: 10px; letter-spacing: 2px; font-size: 1.8em; }
         p { color: #888; margin-bottom: 30px; font-size: 0.9em; line-height: 1.5; }
+        
         .btn-discord { 
             background: var(--discord); 
             color: white; 
@@ -55,7 +56,7 @@
             box-shadow: 0 5px 15px rgba(88, 101, 242, 0.4);
         }
         .footer {
-            margin-top: 20px;
+            margin-top: 25px;
             font-size: 0.75em;
             color: #555;
         }
@@ -63,9 +64,9 @@
 </head>
 <body>
     <div class="login-card">
-        <div style="font-size: 50px; margin-bottom: 10px;">🚔</div>
+        <div style="font-size: 60px; margin-bottom: 10px;">🚔</div>
         <h1>SAPD SYSTEM</h1>
-        <p>Gunakan akun Discord Anda untuk memverifikasi identitas, pangkat, dan akses panel admin.</p>
+        <p>Gunakan akun Discord Anda untuk memverifikasi identitas, pangkat, dan akses panel anggota.</p>
         
         <a href="https://discord.com/api/oauth2/authorize?client_id=1492077767049740309&redirect_uri=https://san-andreas-police-departement.netlify.app/.netlify/functions/auth-callback&response_type=code&scope=identify" class="btn-discord">
             <img src="https://cdn-icons-png.flaticon.com/512/2111/2111370.png" width="20" style="filter: brightness(0) invert(1);">
@@ -73,31 +74,17 @@
         </a>
 
         <div class="footer">
-            &copy; 2026 San Andreas Police Department
+            &copy; 2026 San Andreas Police Department <br>
+            Developed for SAMP Community
         </div>
     </div>
 
     <script>
-        // Logika untuk menangani data setelah redirect dari Netlify Function
+        // Opsional: Jika user yang sudah login iseng balik ke index, 
+        // kita arahkan otomatis kembali ke dashboard.
         window.onload = () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const status = urlParams.get('status');
-            
-            // Jika login berhasil, simpan data ke localStorage
-            if (status === 'success') {
-                const userData = {
-                    discord_id: urlParams.get('id'),
-                    nama_user: urlParams.get('name'),
-                    pangkat: urlParams.get('rank')
-                };
-
-                // Simpan data satu per satu agar bisa dibaca oleh file rekap.html
-                localStorage.setItem("discord_id", userData.discord_id);
-                localStorage.setItem("nama_user", userData.nama_user);
-                localStorage.setItem("pangkat", userData.pangkat);
-
-                // Langsung arahkan ke dashboard/rekap
-                window.location.href = "rekap.html"; 
+            if (localStorage.getItem("discord_id")) {
+                window.location.href = "dashboard.html";
             }
         };
     </script>
