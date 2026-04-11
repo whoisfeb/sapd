@@ -1,4 +1,4 @@
-// File Konfigurasi Global SAPD - Versi Gaji dengan Bonus
+// File: config.js
 const CONFIG = {
     DAFTAR_GAJI: {
         "CHIEF OF POLICE": 80000,
@@ -23,27 +23,23 @@ const CONFIG = {
         "CADET": 24000,
         "UNKNOWN": 0
     },
-    
     TARGET_HADIR: 6,
-    TARGET_FULL_GAJI: 5, // Hadir 5 sudah dianggap gaji full
-    BONUS_RAJIN: 10000    // Bonus jika hadir 6/6
+    TARGET_FULL_GAJI: 5,
+    BONUS_RAJIN: 10000 
 };
 
-// Di dalam config.js
-function hitungGajiMember(pangkat, jumlahHadir) {
+function hitungGajiMember(pangkat, jumlahHariHadir) {
     const rankCek = pangkat ? pangkat.toUpperCase().trim() : "UNKNOWN";
     const gajiPokok = CONFIG.DAFTAR_GAJI[rankCek] || 0;
     
-    // PENGAMAN: Walaupun di database ada 10 absen, 
-    // dalam seminggu maksimal hanya dihitung 6 hari kerja.
-    let hadirValid = jumlahHadir;
-    if (hadirValid > CONFIG.TARGET_HADIR) hadirValid = CONFIG.TARGET_HADIR;
+    // PENGAMAN GLOBAL: Maksimal hari hadir valid adalah 6 (Senin-Sabtu)
+    // Ini mencegah error jika input data mentah lebih dari 6
+    let hadirValid = Math.min(jumlahHariHadir, CONFIG.TARGET_HADIR);
 
     let totalGaji = 0;
     let totalPotongan = 0;
     let alpa = CONFIG.TARGET_HADIR - hadirValid;
 
-    // Logika Gaji Full (Target 5 Hari)
     if (hadirValid >= CONFIG.TARGET_FULL_GAJI) {
         totalGaji = gajiPokok;
     } else {
@@ -53,7 +49,6 @@ function hitungGajiMember(pangkat, jumlahHadir) {
         totalGaji = gajiPokok - totalPotongan;
     }
 
-    // Bonus hadir sempurna (6/6)
     if (hadirValid >= CONFIG.TARGET_HADIR) {
         totalGaji += CONFIG.BONUS_RAJIN;
     }
