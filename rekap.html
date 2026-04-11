@@ -10,10 +10,29 @@
     
     <style>
         :root { --primary: #e94560; --bg: #1a1a2e; --card: #16213e; --text: #ffffff; --success: #27ae60; --info: #2980b9; --warning: #f39c12; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); padding: 20px; margin: 0; display: none; } /* Hidden by default for auth check */
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); padding: 20px; margin: 0; display: none; }
         .header-area { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; gap: 10px; }
         .action-buttons { display: flex; gap: 10px; }
         .card { background: var(--card); padding: 20px; border-radius: 10px; border-top: 4px solid var(--primary); overflow-x: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        
+        /* Tambahan Style untuk Global Salary */
+        .global-stats {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 15px;
+        }
+        .salary-badge {
+            background: rgba(46, 204, 113, 0.1);
+            border: 1px solid var(--success);
+            padding: 10px 20px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+        .salary-badge span { font-size: 0.7em; color: #aaa; text-transform: uppercase; }
+        .salary-badge b { font-size: 1.4em; color: var(--success); }
+
         table { width: 100%; border-collapse: collapse; font-size: 0.8em; min-width: 1100px; }
         th, td { border: 1px solid #30475e; padding: 12px 8px; text-align: center; }
         th { background: #0f3460; position: sticky; top: 0; z-index: 10; }
@@ -54,6 +73,13 @@
             <button class="nav-btn-small" onclick="changeWeek(1)">Next ▶</button>
         </div>
 
+        <div class="global-stats">
+            <div class="salary-badge">
+                <span>Total Pengeluaran Gaji (Minggu Ini)</span>
+                <b id="total-gaji-global">$0</b>
+            </div>
+        </div>
+
         <table id="table-rekap">
             <thead>
                 <tr>
@@ -71,7 +97,6 @@
     </div>
 
 <script>
-    // --- PROTEKSI HALAMAN ---
     function checkAuth() {
         const isAdmin = localStorage.getItem("is_admin");
         if (isAdmin !== "true") {
@@ -83,7 +108,6 @@
     }
     checkAuth();
 
-    // Konfigurasi Supabase
     const _supabase = window.supabase.createClient("https://urclmvdkfkfwvdascobs.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4");
 
     const RANK_ORDER = { "CHIEF OF POLICE": 1, "ASSISTANT CHIEF OF POLICE": 2, "DEPUTY CHIEF OF POLICE": 3, "COMMANDER": 4, "CAPTAIN III": 5, "CAPTAIN II": 6, "CAPTAIN I": 7, "LIEUTENANT III": 8, "LIEUTENANT II": 9, "LIEUTENANT I": 10, "SERGEANT III": 11, "SERGEANT II": 12, "SERGEANT I": 13, "DETECTIVE III": 14, "DETECTIVE II": 15, "DETECTIVE I": 16, "POLICE OFFICER III": 17, "POLICE OFFICER II": 18, "POLICE OFFICER I": 19, "CADET": 20 };
@@ -115,11 +139,15 @@
             }
         });
 
+        let totalGajiSemua = 0; // Penampung Gaji Global
+
         document.getElementById('tbody-weekly').innerHTML = masters.map(m => {
             const u = userWeekly[m.discord_id];
             const gajiPokok = BASE_SALARY[m.pangkat.toUpperCase()] || 0;
             let totalGaji = (gajiPokok / 5) * Math.min(u.totalHadir, 5);
             if (u.totalHadir >= 6) totalGaji += 10000;
+
+            totalGajiSemua += totalGaji; // Tambahkan ke hitungan global
 
             const cWarn = m.total_warning || 0;
             const getIcon = (idx) => {
@@ -130,7 +158,6 @@
                 return `<span class="check-icon">✔</span>`;
             };
 
-            // Menggunakan data admin dari localStorage untuk prompt SP otomatis
             const currentAdminName = localStorage.getItem("nama_user");
             const currentAdminRank = localStorage.getItem("pangkat");
 
@@ -149,6 +176,9 @@
                 <td><button onclick="resetUser('${m.discord_id}')" style="background:none;border:none;cursor:pointer;">🗑</button></td>
             </tr>`;
         }).join('');
+
+        // Tampilkan Total Gaji Global
+        document.getElementById('total-gaji-global').innerText = `$${Math.floor(totalGajiSemua).toLocaleString()}`;
     }
 
     async function sendWarning(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank) {
@@ -234,7 +264,7 @@
         const ws = XLSX.utils.aoa_to_sheet(rows);
         ws['!cols'] = [{wch:25}, {wch:20}, {wch:8}, {wch:8}, {wch:8}, {wch:8}, {wch:8}, {wch:8}, {wch:8}, {wch:12}];
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Rekap");
+        XLSUtils.book_append_sheet(wb, ws, "Rekap");
         XLSX.writeFile(wb, `Rekap_SAPD.xlsx`);
     }
 
