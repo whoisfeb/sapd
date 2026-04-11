@@ -153,26 +153,27 @@
         if (localStorage.getItem("is_admin") === "true") document.getElementById('admin-link').style.display = 'block';
     }
 
-    // LOGIKA HITUNG GAJI & STATISTIK
     async function showGaji() {
         const modal = document.getElementById('gajiModal');
         const discordId = localStorage.getItem("discord_id");
-        const rank = localStorage.getItem("pangkat");
-        modal.style.display = 'block';
+        const rankAsli = localStorage.getItem("pangkat") || "Unknown";
+        const rankCek = rankAsli.toUpperCase().trim(); 
 
-        // Definisi Gaji Pokok sesuai Rank (Ubah angka di sini)
+        modal.style.display = 'block';
+        document.getElementById('val-total').innerText = "Menghitung...";
+
         const daftarGaji = {
-            "Chief of Police": 500000,
-            "Commander": 450000,
-            "Captain": 400000,
-            "Lieutenant": 350000,
-            "Sergeant": 300000,
-            "Officer": 250000,
-            "Cadet": 150000,
-            "Unknown": 0
+            "CHIEF OF POLICE": 1000000,
+            "COMMANDER": 800000,
+            "CAPTAIN": 600000,
+            "LIEUTENANT": 500000,
+            "SERGEANT": 400000,
+            "OFFICER": 300000,
+            "CADET": 150000,
+            "UNKNOWN": 0
         };
 
-        const gajiPokok = daftarGaji[rank] || 0;
+        const gajiPokok = daftarGaji[rankCek] || 0;
         const targetWajibHadir = 6; 
 
         try {
@@ -181,7 +182,7 @@
 
             let hadir = 0, izin = 0, cuti = 0;
             data.forEach(row => {
-                if (row.jam_duty.includes("-")) hadir++;
+                if (row.jam_duty && row.jam_duty.includes("-")) hadir++;
                 else if (row.jam_duty === "IZIN") izin++;
                 else if (row.jam_duty === "CUTI") cuti++;
             });
@@ -189,8 +190,7 @@
             let alpa = targetWajibHadir - hadir;
             if (alpa < 0) alpa = 0;
 
-            // Potongan per Alpa (Misal: potong 10% dari gaji pokok tiap 1 alpa)
-            const potonganPerAlpa = (gajiPokok / targetWajibHadir) * 0.5; 
+            const potonganPerAlpa = (gajiPokok > 0) ? (gajiPokok / targetWajibHadir) * 0.5 : 0; 
             const totalPotongan = alpa * potonganPerAlpa;
             const gajiAkhir = gajiPokok - totalPotongan;
 
@@ -198,9 +198,9 @@
             document.getElementById('stat-izin').innerText = izin;
             document.getElementById('stat-cuti').innerText = cuti;
             document.getElementById('stat-alpa').innerText = alpa;
-            document.getElementById('val-pokok').innerText = "Rp " + gajiPokok.toLocaleString();
-            document.getElementById('val-potongan').innerText = "- Rp " + totalPotongan.toLocaleString();
-            document.getElementById('val-total').innerText = "Rp " + (gajiAkhir < 0 ? 0 : gajiAkhir).toLocaleString();
+            document.getElementById('val-pokok').innerText = "Rp " + gajiPokok.toLocaleString('id-ID');
+            document.getElementById('val-potongan').innerText = "- Rp " + Math.floor(totalPotongan).toLocaleString('id-ID');
+            document.getElementById('val-total').innerText = "Rp " + (gajiAkhir < 0 ? 0 : Math.floor(gajiAkhir)).toLocaleString('id-ID');
 
         } catch (e) { alert("Gagal mengambil data"); }
     }
@@ -226,14 +226,67 @@
 
     function logout() { localStorage.clear(); window.location.href = "index.html"; }
 
-    // Logic Submit tetap sama dengan Netlify Function kamu
     document.getElementById('absensi-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = document.getElementById('btn-submit');
-        btn.disabled = true; btn.innerText = "Mengirim...";
-        // ... (Logika fetch / Netlify sama dengan sebelumnya)
-        alert("Fitur submit aktif menggunakan endpoint Netlify Anda.");
-        btn.disabled = false; btn.innerText = "Kirim Laporan";
+        const msg = document.getElementById('status-msg');
+        const statusAbsen = document.getElementById('status_absen').value;
+        const discordId = localStorage.getItem("discord_id");
+        
+        btn.disabled = true;
+        btn.innerText = "Memverifikasi...";
+
+        try {
+            let dateList = [];
+            if (statusAbsen === "CUTI") {
+                let dStart = new Date(document.getElementById('cuti_mulai').value);
+                let dEnd = new Date(document.getElementById('cuti_selesai').value);
+                if (dEnd < dStart) throw new Error("Tanggal selesai tidak valid.");
+                for (let d = new Date(dStart); d <= dEnd; d.setDate(d.getDate() + 1)) {
+                    if (d.getDay() !== 0) dateList.push(new Date(d));
+                }
+            } else {
+                let tglVal = new Date(document.getElementById('tanggal_absen').value);
+                if (tglVal.getDay() === 0) throw new Error("Hari Minggu libur!");
+                dateList.push(tglVal);
+            }
+
+            let imgUrl = "N/A";
+            const file = document.getElementById('bukti_foto').files[0];
+            if (statusAbsen === "HADIR" && file) {
+                const path = `absensi/${Date.now()}_${discordId}.png`;
+                await _supabase.storage.from('bukti-absen').upload(path, file);
+                imgUrl = _supabase.storage.from('bukti-absen').getPublicUrl(path).data.publicUrl;
+            }
+
+            const reports = dateList.map(d => ({
+                discord_id: discordId,
+                jam_duty: (statusAbsen === "HADIR") ? `${document.getElementById('jam_mulai').value} - ${document.getElementById('jam_selesai').value}` : statusAbsen,
+                kegiatan: document.getElementById('kegiatan').value,
+                bukti_foto: imgUrl,
+                created_at: d.toISOString()
+            }));
+
+            const response = await fetch('/.netlify/functions/submit-absensi', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(reports)
+            });
+
+            const result = await response.json();
+            if (response.status !== 200) throw new Error(result.message);
+
+            msg.innerText = "✔ Berhasil dikirim!";
+            msg.style.color = "#2ecc71";
+            document.getElementById('absensi-form').reset();
+            toggleFormMode();
+        } catch (err) {
+            msg.innerText = "❌ " + err.message;
+            msg.style.color = "#e94560";
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "Kirim Laporan";
+        }
     });
 </script>
 </body>
