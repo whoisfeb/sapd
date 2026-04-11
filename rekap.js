@@ -22,13 +22,14 @@ function checkAuth() {
         const { mon, sun } = getWeekRange(currentWeekOffset);
         document.getElementById('label-minggu').innerText = `${mon.toLocaleDateString('id-ID')} - ${sun.toLocaleDateString('id-ID')}`;
 
-        // MENGAMBIL DATA DARI TABEL absensi_sapd
+        // 1. Ambil Log Absensi
         const { data: logs, error: errLogs } = await _supabase
             .from('absensi_sapd')
             .select('*')
             .gte('created_at', mon.toISOString())
             .lte('created_at', sun.toISOString());
 
+        // 2. Ambil Master User
         const { data: masters, error: errMasters } = await _supabase
             .from('users_master')
             .select('*');
@@ -38,7 +39,7 @@ function checkAuth() {
             return;
         }
 
-        // Sorting berdasarkan pangkat
+        // Sorting berdasarkan pangkat (RANK_ORDER harus sudah didefinisikan secara global/di file lain)
         masters.sort((a, b) => (RANK_ORDER[a.pangkat.toUpperCase()] || 99) - (RANK_ORDER[b.pangkat.toUpperCase()] || 99));
 
         userWeekly = {}; 
@@ -51,21 +52,26 @@ function checkAuth() {
             };
         });
 
+        // 3. Mapping Data Logs ke User Weekly
         logs.forEach(log => {
             const d = new Date(log.created_at).getDay();
             const dateKey = new Date(log.created_at).toISOString().split('T')[0];
             const discordId = log.discord_id;
 
             if (userWeekly[discordId] && d !== 0) {
-                const ket = (log.jam_duty || "").toUpperCase();
+                const ketAsli = (log.jam_duty || "").toUpperCase();
                 
-                // MENGGUNAKAN kolom bukti_foto
+                // Simpan Object Lengkap untuk Detail Popup
                 userWeekly[discordId].days[d] = { 
-                    ket: ket,
-                    bukti: log.bukti_foto 
+                    ket: log.jam_duty || "Tanpa Keterangan",
+                    bukti: log.bukti_foto,
+                    waktu: new Date(log.created_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
+                    divisi: userWeekly[discordId].info.divisi || "-",
+                    status: ketAsli.includes("IZIN") ? "IZIN" : (ketAsli.includes("CUTI") ? "CUTI" : "HADIR")
                 };
 
-                if (!ket.includes("IZIN") && !ket.includes("CUTI")) {
+                // Hitung Kehadiran (Hanya jika bukan Izin/Cuti)
+                if (!ketAsli.includes("IZIN") && !ketAsli.includes("CUTI")) {
                     if (!userWeekly[discordId].uniqueDates.has(dateKey)) {
                         userWeekly[discordId].totalHadir++; 
                         userWeekly[discordId].uniqueDates.add(dateKey); 
@@ -76,9 +82,10 @@ function checkAuth() {
 
         let totalGajiSemua = 0;
 
+        // 4. Render Table
         document.getElementById('tbody-weekly').innerHTML = masters.map(m => {
             const u = userWeekly[m.discord_id];
-            const hasilGaji = hitungGajiMember(m.pangkat, u.totalHadir);
+            const hasilGaji = hitungGajiMember(m.pangkat, u.totalHadir); // Pastikan fungsi ini ada
             const totalGaji = hasilGaji.gajiAkhir;
             totalGajiSemua += totalGaji;
 
@@ -91,10 +98,12 @@ function checkAuth() {
                 let iconClass = "check-icon";
                 let label = "✔";
                 
-                if (data.ket.includes("IZIN")) { iconClass = "status-ic"; label = "I"; }
-                if (data.ket.includes("CUTI")) { iconClass = "status-ic"; label = "C"; }
+                if (data.status === "IZIN") { iconClass = "status-ic"; label = "I"; }
+                if (data.status === "CUTI") { iconClass = "status-ic"; label = "C"; }
 
-                return `<span class="${iconClass}" style="cursor:pointer;" onclick="openDetailPopup('${m.nama_anggota}', ${idx}, '${data.ket}', '${data.bukti}')">${label}</span>`;
+                // Konversi data ke string untuk parameter fungsi
+                const dataStr = JSON.stringify(data).replace(/"/g, '&quot;');
+                return `<span class="${iconClass}" style="cursor:pointer;" onclick="openDetailPopup('${m.nama_anggota}', '${m.pangkat}', ${idx}, ${dataStr})">${label}</span>`;
             };
 
             const currentAdminName = localStorage.getItem("nama_user");
@@ -119,26 +128,33 @@ function checkAuth() {
         document.getElementById('total-gaji-global').innerText = `$${totalGajiSemua.toLocaleString()}`;
     }
 
-    // FUNGSI POPUP DENGAN FIX URL (Langsung pakai link dari database)
-    function openDetailPopup(nama, dayIdx, ket, buktiPath) {
+    // --- FUNGSI POPUP DETAIL ---
+    function openDetailPopup(nama, pangkat, dayIdx, data) {
         const daysName = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
         const modal = document.getElementById('modal-detail');
         const content = document.getElementById('detail-content');
         
-        // Langsung gunakan buktiPath karena di tabel sudah berisi link lengkap
-        const imageUrl = buktiPath || null;
+        const imageUrl = data.bukti || null;
 
         content.innerHTML = `
-            <div style="text-align:left;">
-                <p><b>Anggota:</b> ${nama}</p>
-                <p><b>Hari:</b> ${daysName[dayIdx]}</p>
-                <p><b>Keterangan:</b><br><span style="color:#00adb5;">${ket || 'Tanpa keterangan'}</span></p>
-                <p><b>Bukti Gambar:</b></p>
+            <div style="text-align:left; font-family: 'Segoe UI', sans-serif;">
+                <h3 style="border-bottom: 2px solid #00adb5; padding-bottom: 10px; color: #eee; margin-top:0;">Detail Absensi</h3>
+                <table style="width:100%; color:#ccc; border-spacing: 0 8px;">
+                    <tr><td style="width:110px; color:#00adb5;"><b>Nama</b></td><td>: ${nama}</td></tr>
+                    <tr><td style="color:#00adb5;"><b>Pangkat</b></td><td>: ${pangkat}</td></tr>
+                    <tr><td style="color:#00adb5;"><b>Divisi</b></td><td>: ${data.divisi}</td></tr>
+                    <tr><td style="color:#00adb5;"><b>Hari/Waktu</b></td><td>: ${daysName[dayIdx]}, ${data.waktu}</td></tr>
+                    <tr><td style="color:#00adb5;"><b>Status</b></td><td>: <span style="padding:2px 8px; border-radius:4px; background:#30475e; color:#fff; font-size:12px;">${data.status}</span></td></tr>
+                    <tr><td style="color:#00adb5; vertical-align:top;"><b>Keterangan</b></td><td>: ${data.ket}</td></tr>
+                </table>
+                
+                <p style="margin-top:15px; color:#00adb5; margin-bottom:5px;"><b>Bukti Gambar:</b></p>
                 ${imageUrl ? 
                     `<img src="${imageUrl}" style="width:100%; border-radius:8px; border:1px solid #30475e; cursor:pointer;" 
                       onerror="this.src='https://placehold.co/600x400?text=Gambar+Bermasalah'"
-                      onclick="window.open('${imageUrl}', '_blank')">` : 
-                    `<p style="color:#888; font-style:italic;">Tidak ada bukti gambar tersedia.</p>`
+                      onclick="window.open('${imageUrl}', '_blank')">
+                     <p style="font-size:10px; color:#888; text-align:center; margin-top:5px;">*Klik gambar untuk memperbesar</p>` : 
+                    `<div style="padding:20px; text-align:center; background:#222831; border-radius:8px; color:#888; font-style:italic; border:1px dashed #444;">Tidak ada bukti gambar.</div>`
                 }
             </div>
         `;
@@ -149,11 +165,13 @@ function checkAuth() {
         document.getElementById('modal-detail').style.display = "none";
     }
 
+    // Klik Luar Modal untuk Tutup
     window.onclick = function(event) {
         const modal = document.getElementById('modal-detail');
         if (event.target == modal) closeDetailPopup();
     }
 
+    // --- FUNGSI WARNING & SISTEM ---
     async function sendWarning(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank) {
         if (!confirm(`Kirim SP-${currentWarn + 1} ke Discord?\n(Oleh: ${adminName} - ${adminRank})`)) return;
         
@@ -220,26 +238,6 @@ function checkAuth() {
         return txt.substring(0, 1990);
     }
 
-    function downloadExcel() {
-        const rows = [["Nama Anggota", "Pangkat", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Total", "Gaji"]];
-        document.querySelectorAll("#tbody-weekly tr").forEach(tr => {
-            const rowData = [];
-            tr.querySelectorAll("td").forEach((td, i) => {
-                if(i < 10) {
-                    let val = td.innerText.trim();
-                    if(td.querySelector(".check-icon")) val = "HADIR";
-                    else if(td.querySelector(".cross-icon")) val = "ALPA";
-                    rowData.push(val);
-                }
-            });
-            rows.push(rowData);
-        });
-        const ws = XLSX.utils.aoa_to_sheet(rows);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Rekap");
-        XLSX.writeFile(wb, `Rekap_SAPD.xlsx`);
-    }
-
     function getWeekRange(offset = 0) {
         const now = new Date(); now.setDate(now.getDate() + (offset * 7));
         const day = now.getDay(); const diff = now.getDate() - day + (day === 0 ? -6 : 1);
@@ -249,17 +247,14 @@ function checkAuth() {
     }
     
     async function resetUser(id) {
-        if (!confirm("Hapus data absensi minggu ini?")) return;
+        if (!confirm("Hapus data absensi anggota ini di minggu ini?")) return;
         const { mon, sun } = getWeekRange(currentWeekOffset);
-        
-        await _supabase.from('absensi_sapd').delete()
-            .eq('discord_id', id)
-            .gte('created_at', mon.toISOString())
-            .lte('created_at', sun.toISOString());
-            
+        await _supabase.from('absensi_sapd').delete().eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
         alert("Data berhasil dihapus!");
         loadData();
     }
 
     function changeWeek(dir) { currentWeekOffset += dir; loadData(); }
+    
+    // Jalankan Load Awal
     loadData();
