@@ -57,7 +57,7 @@
 
             <div class="form-group" id="single-date-section">
                 <label id="label-tanggal">Tanggal</label>
-                <input type="date" id="tanggal_absen" required>
+                <input type="date" id="tanggal_absen">
             </div>
 
             <div class="form-group" id="range-date-section" style="display:none;">
@@ -95,7 +95,6 @@
 </div>
 
 <script>
-    // Konfigurasi Supabase
     const _supabase = window.supabase.createClient("https://urclmvdkfkfwvdascobs.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4");
 
     window.onload = () => {
@@ -106,13 +105,11 @@
         const divisi = urlParams.get('divisi');
         const isAdmin = urlParams.get('admin') === 'true';
 
-        // Proteksi Sesi
         if (!discordId && !localStorage.getItem("discord_id")) { 
             window.location.href = "index.html"; 
             return;
         }
 
-        // Simpan Sesi jika baru login
         if (discordId && name) {
             localStorage.setItem("discord_id", discordId);
             localStorage.setItem("nama_user", decodeURIComponent(name));
@@ -136,37 +133,52 @@
 
     function toggleFormMode() {
         const status = document.getElementById('status_absen').value;
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toLocaleDateString('en-CA'); // Format YYYY-MM-DD
+        
         const hadirSec = document.getElementById('hadir-section');
         const singleSec = document.getElementById('single-date-section');
         const rangeSec = document.getElementById('range-date-section');
         const fileInput = document.getElementById('bukti_foto');
         const tglInput = document.getElementById('tanggal_absen');
+        const cutiMulai = document.getElementById('cuti_mulai');
+        const cutiSelesai = document.getElementById('cuti_selesai');
 
-        if (status === "CUTI") {
+        // Reset values & constraints
+        tglInput.value = "";
+        cutiMulai.value = "";
+        cutiSelesai.value = "";
+        tglInput.removeAttribute('min');
+        tglInput.removeAttribute('max');
+        cutiMulai.removeAttribute('min');
+        cutiSelesai.removeAttribute('min');
+
+        if (status === "HADIR") {
+            // HADIR: Hanya Hari Ini & Sebelumnya (Max = Today)
+            singleSec.style.display = "block";
+            rangeSec.style.display = "none";
+            hadirSec.style.display = "block";
+            tglInput.max = today; 
+            tglInput.required = true;
+            fileInput.required = true;
+        } else if (status === "IZIN") {
+            // IZIN: Hanya Hari Ini & Selanjutnya (Min = Today)
+            singleSec.style.display = "block";
+            rangeSec.style.display = "none";
+            hadirSec.style.display = "none";
+            tglInput.min = today; 
+            tglInput.required = true;
+            fileInput.required = false;
+        } else if (status === "CUTI") {
+            // CUTI: Hanya Hari Ini & Selanjutnya (Min = Today)
             singleSec.style.display = "none";
             rangeSec.style.display = "block";
             hadirSec.style.display = "none";
+            cutiMulai.min = today;
+            cutiSelesai.min = today;
             tglInput.required = false;
-            document.getElementById('cuti_mulai').required = true;
-            document.getElementById('cuti_selesai').required = true;
+            cutiMulai.required = true;
+            cutiSelesai.required = true;
             fileInput.required = false;
-        } else {
-            singleSec.style.display = "block";
-            rangeSec.style.display = "none";
-            tglInput.required = true;
-            document.getElementById('cuti_mulai').required = false;
-            document.getElementById('cuti_selesai').required = false;
-            
-            if (status === "HADIR") {
-                tglInput.max = today; 
-                hadirSec.style.display = "block";
-                fileInput.required = true;
-            } else {
-                tglInput.removeAttribute('max');
-                hadirSec.style.display = "none";
-                fileInput.required = false;
-            }
         }
     }
 
@@ -185,42 +197,35 @@
         const discordId = localStorage.getItem("discord_id");
         
         btn.disabled = true;
-        btn.innerText = "Memverifikasi Role & Identitas...";
-        msg.innerText = "";
+        btn.innerText = "Memverifikasi...";
 
         try {
-            // 1. Generate List Tanggal
             let dateList = [];
             if (statusAbsen === "CUTI") {
                 let dStart = new Date(document.getElementById('cuti_mulai').value);
                 let dEnd = new Date(document.getElementById('cuti_selesai').value);
-                if (dEnd < dStart) throw new Error("Tanggal selesai tidak boleh sebelum tanggal mulai.");
-                
+                if (dEnd < dStart) throw new Error("Tanggal selesai tidak valid.");
                 for (let d = new Date(dStart); d <= dEnd; d.setDate(d.getDate() + 1)) {
                     if (d.getDay() !== 0) dateList.push(new Date(d));
                 }
             } else {
                 let tglVal = new Date(document.getElementById('tanggal_absen').value);
-                if (tglVal.getDay() === 0) throw new Error("Hari Minggu libur, tidak perlu absen!");
+                if (tglVal.getDay() === 0) throw new Error("Hari Minggu libur!");
                 dateList.push(tglVal);
             }
 
-            if (dateList.length === 0) throw new Error("Tidak ada tanggal kerja valid (Minggu dilewati).");
+            if (dateList.length === 0) throw new Error("Pilih tanggal valid.");
 
-            // 2. Upload Foto ke Storage
             let imgUrl = "N/A";
             const file = document.getElementById('bukti_foto').files[0];
             if (statusAbsen === "HADIR" && file) {
                 btn.innerText = "Mengunggah Foto...";
                 const path = `absensi/${Date.now()}_${discordId}.png`;
-                const { error: upErr } = await _supabase.storage.from('bukti-absen').upload(path, file);
-                if (upErr) throw upErr;
+                await _supabase.storage.from('bukti-absen').upload(path, file);
                 imgUrl = _supabase.storage.from('bukti-absen').getPublicUrl(path).data.publicUrl;
             }
 
-            // 3. Kirim ke Backend (submit-absensi.js)
-            btn.innerText = "Sinkronisasi & Mengirim...";
-            
+            btn.innerText = "Mengirim...";
             const reports = dateList.map(d => ({
                 discord_id: discordId,
                 jam_duty: (statusAbsen === "HADIR") ? `${document.getElementById('jam_mulai').value} - ${document.getElementById('jam_selesai').value}` : statusAbsen,
@@ -236,24 +241,21 @@
             });
 
             const result = await response.json();
-
-            // Handle jika di-kick (403)
             if (response.status === 403) {
-                alert("AKSES DICABUT: Anda tidak lagi memiliki Role SAPD di Discord!");
+                alert("AKSES DICABUT!");
                 localStorage.clear();
                 window.location.href = "index.html";
                 return;
             }
 
-            if (response.status !== 200) throw new Error(result.message || "Gagal mengirim.");
+            if (response.status !== 200) throw new Error(result.message);
 
-            // Update Local Storage dengan data terbaru dari hasil sync Discord
             localStorage.setItem("nama_user", result.updatedData.name);
             localStorage.setItem("pangkat", result.updatedData.pangkat);
             localStorage.setItem("divisi", result.updatedData.divisi);
             updateUI();
 
-            msg.innerText = "✔ Berhasil! Laporan terkirim & identitas sinkron.";
+            msg.innerText = "✔ Berhasil dikirim!";
             msg.style.color = "#2ecc71";
             document.getElementById('absensi-form').reset();
             toggleFormMode();
@@ -267,6 +269,5 @@
         }
     });
 </script>
-
 </body>
 </html>
