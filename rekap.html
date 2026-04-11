@@ -132,9 +132,10 @@
         });
 
         logs.forEach(log => {
-            const d = new Date(log.created_at).getDay();
-            // Ambil tanggal murni (YYYY-MM-DD)
-            const dateKey = new Date(log.created_at).toISOString().split('T')[0];
+            // Ambil string tanggal murni 'YYYY-MM-DD' langsung dari database
+            const rawDate = log.created_at.split('T')[0]; 
+            const dObj = new Date(rawDate);
+            const d = dObj.getDay();
             const discordId = log.discord_id;
 
             if (userWeekly[discordId] && d !== 0) {
@@ -143,11 +144,11 @@
                 // Menampilkan status di tabel (Senin-Sabtu)
                 userWeekly[discordId].days[d] = { ket: ket };
 
-                // LOGIKA ANTI-SPAM: Cek apakah hari ini sudah dihitung hadir
+                // LOGIKA ANTI-SPAM: Gunakan rawDate sebagai kunci unik
                 if (!ket.includes("IZIN") && !ket.includes("CUTI")) {
-                    if (!userWeekly[discordId].uniqueDates.has(dateKey)) {
+                    if (!userWeekly[discordId].uniqueDates.has(rawDate)) {
                         userWeekly[discordId].totalHadir++; 
-                        userWeekly[discordId].uniqueDates.add(dateKey); 
+                        userWeekly[discordId].uniqueDates.add(rawDate); 
                     }
                 }
             }
