@@ -50,6 +50,25 @@
     transform: scale(1.2);
     display: inline-block;
 }
+
+        /* Animasi Fade In untuk Popup */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+#imageModal > div {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+#modalContent img {
+    transition: transform 0.2s;
+    cursor: zoom-in;
+}
+
+#modalContent img:hover {
+    transform: scale(1.02);
+}
         
     </style>
 </head>
