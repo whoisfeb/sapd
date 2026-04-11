@@ -1,5 +1,7 @@
 // File: config.js
-const CONFIG = {
+
+// PENTING: Gunakan window. agar variabel bisa diakses oleh file HTML lain
+window.CONFIG = {
     DAFTAR_GAJI: {
         "CHIEF OF POLICE": 80000,
         "ASSISTANT CHIEF OF POLICE": 76000,
@@ -28,29 +30,50 @@ const CONFIG = {
     BONUS_RAJIN: 10000 
 };
 
-function hitungGajiMember(pangkat, jumlahHariHadir) {
-    const rankCek = pangkat ? pangkat.toUpperCase().trim() : "UNKNOWN";
-    const gajiPokok = CONFIG.DAFTAR_GAJI[rankCek] || 0;
-    
-    // PENGAMAN GLOBAL: Maksimal hari hadir valid adalah 6 (Senin-Sabtu)
-    // Ini mencegah error jika input data mentah lebih dari 6
-    let hadirValid = Math.min(jumlahHariHadir, CONFIG.TARGET_HADIR);
+// Tambahkan variabel ini untuk memperbaiki error "RANK_ORDER is not defined"
+window.RANK_ORDER = {
+    "CHIEF OF POLICE": 1,
+    "ASSISTANT CHIEF OF POLICE": 2,
+    "DEPUTY CHIEF OF POLICE": 3,
+    "COMMANDER": 4,
+    "CAPTAIN III": 5,
+    "CAPTAIN II": 6,
+    "CAPTAIN I": 7,
+    "LIEUTENANT III": 8,
+    "LIEUTENANT II": 9,
+    "LIEUTENANT I": 10,
+    "SERGEANT III": 11,
+    "SERGEANT II": 12,
+    "SERGEANT I": 13,
+    "DETECTIVE III": 14,
+    "DETECTIVE II": 15,
+    "DETECTIVE I": 16,
+    "POLICE OFFICER III": 17,
+    "POLICE OFFICER II": 18,
+    "POLICE OFFICER I": 19,
+    "CADET": 20
+};
 
+window.hitungGajiMember = function(pangkat, jumlahHariHadir) {
+    const rankCek = pangkat ? pangkat.toUpperCase().trim() : "UNKNOWN";
+    const gajiPokok = window.CONFIG.DAFTAR_GAJI[rankCek] || 0;
+    
+    let hadirValid = Math.min(jumlahHariHadir, window.CONFIG.TARGET_HADIR);
     let totalGaji = 0;
     let totalPotongan = 0;
-    let alpa = CONFIG.TARGET_HADIR - hadirValid;
+    let alpa = window.CONFIG.TARGET_HADIR - hadirValid;
 
-    if (hadirValid >= CONFIG.TARGET_FULL_GAJI) {
+    if (hadirValid >= window.CONFIG.TARGET_FULL_GAJI) {
         totalGaji = gajiPokok;
     } else {
-        const kekurangan = CONFIG.TARGET_FULL_GAJI - hadirValid;
-        const potonganPerHari = gajiPokok / CONFIG.TARGET_FULL_GAJI;
+        const kekurangan = window.CONFIG.TARGET_FULL_GAJI - hadirValid;
+        const potonganPerHari = gajiPokok / window.CONFIG.TARGET_FULL_GAJI;
         totalPotongan = kekurangan * potonganPerHari;
         totalGaji = gajiPokok - totalPotongan;
     }
 
-    if (hadirValid >= CONFIG.TARGET_HADIR) {
-        totalGaji += CONFIG.BONUS_RAJIN;
+    if (hadirValid >= window.CONFIG.TARGET_HADIR) {
+        totalGaji += window.CONFIG.BONUS_RAJIN;
     }
 
     return {
