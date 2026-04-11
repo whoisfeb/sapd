@@ -125,19 +125,33 @@
             userWeekly[m.discord_id] = { 
                 info: m, 
                 days: { 1:null, 2:null, 3:null, 4:null, 5:null, 6:null }, 
-                totalHadir: 0 
+                totalHadir: 0,
+                // TAMBAHKAN INI: Untuk mencatat tanggal unik
+                uniqueDates: new Set() 
             };
         });
 
         logs.forEach(log => {
             const d = new Date(log.created_at).getDay();
-            if (userWeekly[log.discord_id] && d !== 0) {
+            // Ambil tanggal murni (YYYY-MM-DD)
+            const dateKey = new Date(log.created_at).toISOString().split('T')[0];
+            const discordId = log.discord_id;
+
+            if (userWeekly[discordId] && d !== 0) {
                 const ket = (log.jam_duty || "").toUpperCase();
-                userWeekly[log.discord_id].days[d] = { ket: ket };
-                if (!ket.includes("IZIN") && !ket.includes("CUTI")) userWeekly[log.discord_id].totalHadir++;
+                
+                // Menampilkan status di tabel (Senin-Sabtu)
+                userWeekly[discordId].days[d] = { ket: ket };
+
+                // LOGIKA ANTI-SPAM: Cek apakah hari ini sudah dihitung hadir
+                if (!ket.includes("IZIN") && !ket.includes("CUTI")) {
+                    if (!userWeekly[discordId].uniqueDates.has(dateKey)) {
+                        userWeekly[discordId].totalHadir++; 
+                        userWeekly[discordId].uniqueDates.add(dateKey); 
+                    }
+                }
             }
         });
-
         let totalGajiSemua = 0;
 
         document.getElementById('tbody-weekly').innerHTML = masters.map(m => {
