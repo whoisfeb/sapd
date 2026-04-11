@@ -1,2 +1,8 @@
 [[plugins]]
 package = "netlify-plugin-js-obfuscator"
+
+  [plugins.inputs]
+  # Opsi ini akan membuat JS Anda jadi kode hexadecimal rahasia
+  compact = true
+  identifierNamesGenerator = "hexadecimal"
+  seed = 0
