@@ -56,27 +56,33 @@ async function updateGajiDisplay() {
     const discId = localStorage.getItem("discord_id");
     const pangkat = localStorage.getItem("pangkat");
     
-    // --- LOGIKA RENTANG MINGGU INI (SAMA DENGAN REKAP ADMIN) ---
-    const curr = new Date();
-    const first = curr.getDate() - (curr.getDay() === 0 ? 6 : curr.getDay() - 1); 
-    const last = first + 6;
+    const sekarang = new Date();
+    const hari = sekarang.getDay(); // 0 = Minggu
 
-    const senin = new Date(curr.setDate(first));
+    // =========================
+    // HITUNG SENIN
+    // =========================
+    const selisihKeSenin = (hari === 0 ? -6 : 1 - hari);
+    const senin = new Date(sekarang);
+    senin.setDate(sekarang.getDate() + selisihKeSenin);
     senin.setHours(0, 0, 0, 0);
 
-    const minggu = new Date(curr.setDate(last));
-    minggu.setHours(23, 59, 59, 999);
+    // =========================
+    // HITUNG SABTU
+    // =========================
+    const sabtu = new Date(senin);
+    sabtu.setDate(senin.getDate() + 5); // Senin + 5 = Sabtu
+    sabtu.setHours(23, 59, 59, 999);
 
     try {
-        // Ambil data dari Senin jam 00:00 sampai Minggu jam 23:59
         const { data: logs, error } = await _supabase
             .from('absensi_sapd')
             .select('*')
             .eq('discord_id', discId)
             .gte('created_at', senin.toISOString())
-            .lte('created_at', minggu.toISOString())
+            .lte('created_at', sabtu.toISOString()) // ✅ FIX DI SINI
             .order('created_at', { ascending: false });
-        
+
         if (error) throw error;
 
         const hariHadirUnik = new Set();
@@ -85,16 +91,15 @@ async function updateGajiDisplay() {
 
         if (logs) {
             logs.forEach(l => {
-                // Gunakan toLocaleDateString agar filter tanggal sesuai zona waktu user (WIB/WITA)
-                const tglLocal = new Date(l.created_at).toLocaleDateString('en-CA'); 
+                const tanggal = new Date(l.created_at).toISOString().split('T')[0];
                 const status = (l.tipe_absen || "").toUpperCase();
 
-                if (status === "IZIN") {
-                    hariIzinUnik.add(tglLocal);
+                if (status === "HADIR") {
+                    hariHadirUnik.add(tanggal);
+                } else if (status === "IZIN") {
+                    hariIzinUnik.add(tanggal);
                 } else if (status === "CUTI") {
-                    hariCutiUnik.add(tglLocal);
-                } else if (status === "HADIR") {
-                    hariHadirUnik.add(tglLocal);
+                    hariCutiUnik.add(tanggal);
                 }
             });
         }
@@ -102,23 +107,20 @@ async function updateGajiDisplay() {
         const h = hariHadirUnik.size;
         const i = hariIzinUnik.size;
         const c = hariCutiUnik.size;
-        const totalInput = h + i + c;
-        let a = Math.max(0, 6 - totalInput);
 
-        // Pastikan fungsi hitungGajiMember di config.js dipanggil dengan benar
-        // Biasanya: const hasil = hitungGajiMember(pangkat, h);
-        const hasil = typeof hitungGajiMember === "function" 
-            ? hitungGajiMember(pangkat, h) 
-            : { gajiAkhir: 0 };
-        
+        const totalInput = h + i + c;
+        const a = Math.max(0, 6 - totalInput);
+
+        const hasil = hitungGajiMember(pangkat, h);
+
         document.getElementById('gaji-val').innerText = `$${hasil.gajiAkhir.toLocaleString()}`;
         document.getElementById('stat-hadir').innerText = h;
         document.getElementById('stat-izin').innerText = i;
         document.getElementById('stat-cuti').innerText = c;
         document.getElementById('stat-alpa').innerText = a;
 
-    } catch (err) { 
-        console.error("Gagal update stats:", err); 
+    } catch (err) {
+        console.error("Gagal update stats:", err);
     }
 }
 
