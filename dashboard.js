@@ -1,5 +1,5 @@
 /**
- * DASHBOARD.JS - UPDATED DATABASE MAPPING
+ * DASHBOARD.JS - VERSI FINAL (FILTER MINGGU INI)
  */
 
 const _supabase = window.supabase.createClient(
@@ -47,7 +47,8 @@ function updateUI() {
     document.getElementById('name-display').innerText = localStorage.getItem("nama_user");
     document.getElementById('rank-display').innerText = `${localStorage.getItem("pangkat")} | ${localStorage.getItem("divisi")}`;
     if (localStorage.getItem("is_admin") === "true") {
-        document.getElementById('admin-link').style.display = 'block';
+        const adminLink = document.getElementById('admin-link');
+        if(adminLink) adminLink.style.display = 'block';
     }
 }
 
@@ -55,19 +56,26 @@ async function updateGajiDisplay() {
     const discId = localStorage.getItem("discord_id");
     const pangkat = localStorage.getItem("pangkat");
     
-    const d = new Date();
-    const day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6 : 1);
-    const monday = new Date(d.setDate(diff));
-    monday.setHours(0, 0, 0, 0);
+    // --- LOGIKA FILTER MINGGU INI (SENIN - SEKARANG) ---
+    const sekarang = new Date();
+    const hari = sekarang.getDay(); // 0 = Minggu, 1 = Senin, dst.
+    const selisihKeSenin = (hari === 0 ? -6 : 1 - hari);
+    
+    const seninMingguIni = new Date(sekarang);
+    seninMingguIni.setDate(sekarang.getDate() + selisihKeSenin);
+    seninMingguIni.setHours(0, 0, 0, 0); 
 
     try {
-        // Ambil data dengan kolom tipe_absen yang baru
-        const { data: logs } = await _supabase
+        // Ambil data HANYA dari awal minggu ini sampai detik ini
+        const { data: logs, error } = await _supabase
             .from('absensi_sapd')
-            .select('tipe_absen, created_at')
+            .select('*')
             .eq('discord_id', discId)
-            .gte('created_at', monday.toISOString());
+            .gte('created_at', seninMingguIni.toISOString())
+            .order('created_at', { ascending: false });
         
+        if (error) throw error;
+
         const hariHadirUnik = new Set();
         const hariIzinUnik = new Set();
         const hariCutiUnik = new Set();
@@ -85,6 +93,9 @@ async function updateGajiDisplay() {
                     hariHadirUnik.add(tanggalHanya);
                 }
             });
+            
+            // Opsional: Jika Anda memiliki fungsi render tabel, panggil di sini
+            // renderTable(logs);
         }
 
         const h = hariHadirUnik.size;
@@ -184,17 +195,16 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
 
         btn.innerText = "Mengirim...";
         
-        // PEMETAAN DATA KE KOLOM SUPABASE (tipe_absen, jam_duty, alasan)
         const reports = dateList.map(d => ({
             discord_id: discordId,
             nama_anggota: currentName,
             pangkat: currentRank,
             divisi: currentDiv,
-            tipe_absen: statusAbsen, // HADIR/IZIN/CUTI
+            tipe_absen: statusAbsen, 
             jam_duty: (statusAbsen === "HADIR") 
                 ? `${document.getElementById('jam_mulai').value} - ${document.getElementById('jam_selesai').value}` 
                 : null,
-            alasan: document.getElementById('kegiatan').value, // Menampung kegiatan/alasan
+            alasan: document.getElementById('kegiatan').value,
             bukti_foto: imgUrl,
             created_at: d.toISOString()
         }));
