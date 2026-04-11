@@ -45,10 +45,10 @@
     if (userWeekly[discordId] && d !== 0) {
         const ket = (log.jam_duty || "").toUpperCase();
         
-        // PASTIKAN BARIS INI MENYIMPAN bukti_gambar
+        // SIMPAN DATA bukti_gambar KE DALAM OBYEK HARI
         userWeekly[discordId].days[d] = { 
-            ket: ket, 
-            bukti_gambar: log.bukti_gambar // Tambahkan ini agar getIcon bisa membaca nama filenya
+            ket: ket,
+            bukti_gambar: log.bukti_gambar // Baris ini sangat penting
         };
 
         if (!ket.includes("IZIN") && !ket.includes("CUTI")) {
@@ -74,19 +74,22 @@
             const getIcon = (idx) => {
     const data = u.days[idx];
     if (!data) return `<span class="cross-icon">✘</span>`;
+    
+    // Jika statusnya Izin atau Cuti
     if (data.ket.includes("IZIN")) return `<span class="status-ic">I</span>`;
     if (data.ket.includes("CUTI")) return `<span class="status-ic">C</span>`;
     
-    // Jika ada bukti_gambar, buat ikon centang bisa diklik
+    // Jika statusnya Hadir dan memiliki bukti gambar
     if (data.bukti_gambar) {
-        // Ganti 'bukti-absen' dan 'absensi' sesuai nama bucket & folder kamu
+        // Link mengarah ke folder 'absensi' di dalam bucket 'bukti-absen'
         const imageUrl = `https://urclmvdkfkfwvdascobs.supabase.co/storage/v1/object/public/bukti-absen/absensi/${data.bukti_gambar}`;
         
-        return `<a href="${imageUrl}" target="_blank" style="text-decoration:none;">
-                    <span class="check-icon" title="Klik untuk lihat bukti">✔</span>
+        return `<a href="${imageUrl}" target="_blank" title="Klik untuk lihat bukti foto" style="text-decoration:none;">
+                    <span class="check-icon" style="cursor:pointer;">✔</span>
                 </a>`;
     }
     
+    // Jika hadir tapi tidak ada data gambar di database
     return `<span class="check-icon">✔</span>`;
 };
             const currentAdminName = localStorage.getItem("nama_user");
