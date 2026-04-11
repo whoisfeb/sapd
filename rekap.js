@@ -45,7 +45,7 @@ function checkAuth() {
                 // Simpan keterangan dan nama file bukti_gambar
                 userWeekly[discordId].days[d] = { 
                     ket: ket,
-                    bukti: log.bukti_gambar 
+                    bukti: log.bukti_foto
                 };
 
                 if (!ket.includes("IZIN") && !ket.includes("CUTI")) {
@@ -257,9 +257,9 @@ function checkAuth() {
     async function resetUser(id) {
         if (!confirm("Hapus data absensi & bukti gambar anggota ini di minggu ini?")) return;
         const { mon, sun } = getWeekRange(currentWeekOffset);
-        const { data: logs } = await _supabase.from('absensi_sapd').select('bukti_gambar').eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+        const { data: logs } = await _supabase.from('absensi_sapd').select('bukti_foto').eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
         if (logs && logs.length > 0) {
-            const filesToRemove = logs.map(log => log.bukti_gambar ? `absensi/${log.bukti_gambar}` : null).filter(path => path !== null);
+            const filesToRemove = logs.map(log => log.bukti_foto ? `absensi/${log.bukti_foto}` : null).filter(path => path !== null);
             if (filesToRemove.length > 0) {
                 await _supabase.storage.from('bukti-absen').remove(filesToRemove);
             }
@@ -272,9 +272,9 @@ function checkAuth() {
     async function resetAllWeeklyData() {
         if (!confirm("Hapus SEMUA data absensi & bukti gambar minggu ini?")) return;
         const { mon, sun } = getWeekRange(currentWeekOffset);
-        const { data: allLogs } = await _supabase.from('absensi_sapd').select('bukti_gambar').gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+        const { data: allLogs } = await _supabase.from('absensi_sapd').select('bukti_foto').gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
         if (allLogs && allLogs.length > 0) {
-            const filesToRemove = allLogs.map(log => log.bukti_gambar ? `absensi/${log.bukti_gambar}` : null).filter(path => path !== null);
+            const filesToRemove = allLogs.map(log => log.bukti_foto ? `absensi/${log.bukti_foto}` : null).filter(path => path !== null);
             if (filesToRemove.length > 0) {
                 await _supabase.storage.from('bukti-absen').remove(filesToRemove);
             }
