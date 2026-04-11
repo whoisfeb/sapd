@@ -1,6 +1,7 @@
 const axios = require('axios');
 const { createClient } = require('@supabase/supabase-js');
 
+// Inisialisasi Supabase menggunakan Environment Variables di Netlify
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
 exports.handler = async (event) => {
@@ -8,7 +9,7 @@ exports.handler = async (event) => {
     if (!code) return { statusCode: 400, body: "Authorization code missing" };
 
     try {
-        // 1. Tukar code dengan token OAuth2
+        // 1. Tukar code dengan token OAuth2 dari Discord
         const tokenRes = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({
             client_id: process.env.DISCORD_CLIENT_ID,
             client_secret: process.env.DISCORD_CLIENT_SECRET,
@@ -26,8 +27,7 @@ exports.handler = async (event) => {
         });
         const userId = userRes.data.id;
 
-        // 3. Ambil data member langsung dari API Discord (Real-time)
-        // Kita menggunakan Bot Token agar bisa melihat role member tersebut
+        // 3. Ambil data member (Nickname & Roles) menggunakan Bot Token
         const memberRes = await axios.get(
             `https://discord.com/api/v10/guilds/${process.env.DISCORD_GUILD_ID}/members/${userId}`,
             { headers: { Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}` } }
@@ -36,21 +36,21 @@ exports.handler = async (event) => {
         const { nick, roles, user: userData } = memberRes.data;
         const displayName = nick || userData.global_name || userData.username;
 
-        // --- VALIDASI ROLE INTI MENGGUNAKAN ENV NETLIFY ---
+        // --- VALIDASI ROLE INTI ---
         const REQUIRED_ROLE_ID = process.env.DISCORD_REQUIRED_ROLE_ID; 
         const hasRequiredRole = roles.includes(REQUIRED_ROLE_ID);
 
         if (!hasRequiredRole) {
-            // JIKA TIDAK PUNYA ROLE: Hapus dari tabel master dan tolak login
+            // Jika role dicabut di Discord, hapus dari database master
             await supabase.from('users_master').delete().eq('discord_id', userId);
             
             return {
                 statusCode: 403,
-                body: "AKSES DITOLAK: Anda tidak memiliki Role Inti yang terdaftar di sistem."
+                body: "AKSES DITOLAK: Anda tidak memiliki Role SAPD di Discord."
             };
         }
 
-        // --- MAPPING DATA (PANGKAT & DIVISI) ---
+        // --- MAPPING PANGKAT & DIVISI ---
         const PANGKAT_MAP = {
             "1444909938001580257": "CHIEF OF POLICE",
             "1444909771181522974": "ASSISTANT CHIEF OF POLICE",
@@ -92,7 +92,7 @@ exports.handler = async (event) => {
             if (DIVISI_MAP[r]) userDivisi = DIVISI_MAP[r];
         });
 
-        // UPDATE DATA DI BUKU INDUK (users_master)
+        // 4. Update Database Master Supabase
         await supabase.from('users_master').upsert({
             discord_id: userId,
             nama_anggota: displayName,
@@ -101,8 +101,13 @@ exports.handler = async (event) => {
             last_login: new Date().toISOString()
         });
 
-        // 4. Redirect ke Dashboard dengan data yang sudah diverifikasi
-        const redirectUrl = `/dashboard.html?id=${userId}&name=${encodeURIComponent(displayName)}&pangkat=${encodeURIComponent(userPangkat)}&divisi=${encodeURIComponent(userDivisi)}&admin=${isAdmin}`;
+        // 5. Redirect ke Dashboard dengan data yang sudah diverifikasi
+        // isAdmin dipaksa menjadi string 'true' atau 'false' agar mudah dibaca frontend
+        const redirectUrl = `/dashboard.html?id=${userId}` +
+                            `&name=${encodeURIComponent(displayName)}` +
+                            `&pangkat=${encodeURIComponent(userPangkat)}` +
+                            `&divisi=${encodeURIComponent(userDivisi)}` +
+                            `&admin=${isAdmin ? 'true' : 'false'}`;
         
         return {
             statusCode: 302,
@@ -113,7 +118,7 @@ exports.handler = async (event) => {
         console.error("Login Error:", err);
         return { 
             statusCode: 500, 
-            body: "Terjadi kesalahan saat memproses login. Pastikan bot Discord aktif." 
+            body: "Terjadi kesalahan server. Pastikan BOT Discord aktif dan Environment Variables di Netlify sudah benar." 
         };
     }
 };
