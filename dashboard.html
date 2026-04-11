@@ -190,37 +190,69 @@
     }
 
     async function updateGajiDisplay() {
-        const discId = localStorage.getItem("discord_id");
-        const pangkat = localStorage.getItem("pangkat");
+    const discId = localStorage.getItem("discord_id");
+    const pangkat = localStorage.getItem("pangkat");
+    
+    // Hitung awal minggu (Senin)
+    const d = new Date();
+    const day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6 : 1);
+    const monday = new Date(d.setDate(diff));
+    monday.setHours(0, 0, 0, 0);
+
+    try {
+        // Ambil data dari awal minggu sampai sekarang
+        const { data: logs } = await _supabase
+            .from('absensi_sapd')
+            .select('jam_duty, created_at')
+            .eq('discord_id', discId)
+            .gte('created_at', monday.toISOString());
         
-        const d = new Date();
-        const day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6:1);
-        const monday = new Date(d.setDate(diff));
-        monday.setHours(0,0,0,0);
+        // Gunakan Set untuk memastikan hanya 1 kali hadir yang dihitung per tanggal
+        const hariHadirUnik = new Set();
+        const hariIzinUnik = new Set();
+        const hariCutiUnik = new Set();
 
-        try {
-            const { data: logs } = await _supabase.from('absensi_sapd').select('jam_duty').eq('discord_id', discId).gte('created_at', monday.toISOString());
-            
-            let h = 0, i = 0, c = 0;
-            if (logs) {
-                logs.forEach(l => {
-                    const ket = (l.jam_duty || "").toUpperCase();
-                    if (ket.includes("IZIN")) i++;
-                    else if (ket.includes("CUTI")) c++;
-                    else h++;
-                });
-            }
+        if (logs) {
+            logs.forEach(l => {
+                // Ambil format tanggal saja (YYYY-MM-DD) sebagai kunci unik
+                const tanggalHanya = new Date(l.created_at).toISOString().split('T')[0];
+                const ket = (l.jam_duty || "").toUpperCase();
 
-            let a = Math.max(0, 6 - (h + i + c));
-            const hasil = hitungGajiMember(pangkat, h);
-            
-            document.getElementById('gaji-val').innerText = `$${hasil.gajiAkhir.toLocaleString()}`;
-            document.getElementById('stat-hadir').innerText = h;
-            document.getElementById('stat-izin').innerText = i;
-            document.getElementById('stat-cuti').innerText = c;
-            document.getElementById('stat-alpa').innerText = a;
-        } catch (err) { console.error("Gagal update stats:", err); }
+                if (ket.includes("IZIN")) {
+                    hariIzinUnik.add(tanggalHanya);
+                } else if (ket.includes("CUTI")) {
+                    hariCutiUnik.add(tanggalHanya);
+                } else {
+                    // Jika statusnya adalah waktu (jam duty), masukkan ke hadir
+                    hariHadirUnik.add(tanggalHanya);
+                }
+            });
+        }
+
+        // Ambil jumlah hari unik (ukuran dari Set)
+        const h = hariHadirUnik.size;
+        const i = hariIzinUnik.size;
+        const c = hariCutiUnik.size;
+
+        // Hitung Alpa (Maksimal 6 hari kerja Senin-Sabtu)
+        const totalInput = h + i + c;
+        let a = Math.max(0, 6 - totalInput);
+
+        // PANGGIL FUNGSI GLOBAL DARI config.js
+        // Pastikan config.js sudah dimuat di atas script ini
+        const hasil = hitungGajiMember(pangkat, h);
+        
+        // Update Tampilan UI
+        document.getElementById('gaji-val').innerText = `$${hasil.gajiAkhir.toLocaleString()}`;
+        document.getElementById('stat-hadir').innerText = h;
+        document.getElementById('stat-izin').innerText = i;
+        document.getElementById('stat-cuti').innerText = c;
+        document.getElementById('stat-alpa').innerText = a;
+
+    } catch (err) { 
+        console.error("Gagal update stats:", err); 
     }
+}
 
     function toggleFormMode() {
         const status = document.getElementById('status_absen').value;
