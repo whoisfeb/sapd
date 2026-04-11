@@ -133,7 +133,7 @@
 
     function toggleFormMode() {
         const status = document.getElementById('status_absen').value;
-        const today = new Date().toLocaleDateString('en-CA'); // Format YYYY-MM-DD
+        const today = new Date().toLocaleDateString('en-CA'); 
         
         const hadirSec = document.getElementById('hadir-section');
         const singleSec = document.getElementById('single-date-section');
@@ -143,7 +143,6 @@
         const cutiMulai = document.getElementById('cuti_mulai');
         const cutiSelesai = document.getElementById('cuti_selesai');
 
-        // Reset values & constraints
         tglInput.value = "";
         cutiMulai.value = "";
         cutiSelesai.value = "";
@@ -153,7 +152,6 @@
         cutiSelesai.removeAttribute('min');
 
         if (status === "HADIR") {
-            // HADIR: Hanya Hari Ini & Sebelumnya (Max = Today)
             singleSec.style.display = "block";
             rangeSec.style.display = "none";
             hadirSec.style.display = "block";
@@ -161,7 +159,6 @@
             tglInput.required = true;
             fileInput.required = true;
         } else if (status === "IZIN") {
-            // IZIN: Hanya Hari Ini & Selanjutnya (Min = Today)
             singleSec.style.display = "block";
             rangeSec.style.display = "none";
             hadirSec.style.display = "none";
@@ -169,7 +166,6 @@
             tglInput.required = true;
             fileInput.required = false;
         } else if (status === "CUTI") {
-            // CUTI: Hanya Hari Ini & Selanjutnya (Min = Today)
             singleSec.style.display = "none";
             rangeSec.style.display = "block";
             hadirSec.style.display = "none";
@@ -250,6 +246,7 @@
 
             if (response.status !== 200) throw new Error(result.message);
 
+            // Update data lokal jika ada perubahan dari server
             localStorage.setItem("nama_user", result.updatedData.name);
             localStorage.setItem("pangkat", result.updatedData.pangkat);
             localStorage.setItem("divisi", result.updatedData.divisi);
