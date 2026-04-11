@@ -29,29 +29,32 @@ const CONFIG = {
     BONUS_RAJIN: 10000    // Bonus jika hadir 6/6
 };
 
+// Di dalam config.js
 function hitungGajiMember(pangkat, jumlahHadir) {
     const rankCek = pangkat ? pangkat.toUpperCase().trim() : "UNKNOWN";
     const gajiPokok = CONFIG.DAFTAR_GAJI[rankCek] || 0;
     
+    // PENGAMAN: Walaupun di database ada 10 absen, 
+    // dalam seminggu maksimal hanya dihitung 6 hari kerja.
+    let hadirValid = jumlahHadir;
+    if (hadirValid > CONFIG.TARGET_HADIR) hadirValid = CONFIG.TARGET_HADIR;
+
     let totalGaji = 0;
     let totalPotongan = 0;
-    let alpa = CONFIG.TARGET_HADIR - jumlahHadir;
-    if (alpa < 0) alpa = 0;
+    let alpa = CONFIG.TARGET_HADIR - hadirValid;
 
-    // Logika 1: Jika hadir 5 atau lebih, gaji tetap FULL
-    if (jumlahHadir >= CONFIG.TARGET_FULL_GAJI) {
+    // Logika Gaji Full (Target 5 Hari)
+    if (hadirValid >= CONFIG.TARGET_FULL_GAJI) {
         totalGaji = gajiPokok;
     } else {
-        // Logika 2: Jika di bawah 5, potongan dihitung dari selisih ke target 5
-        // Misal hadir 4, berarti kurang 1 hari dari batas full gaji
-        const kekurangan = CONFIG.TARGET_FULL_GAJI - jumlahHadir;
+        const kekurangan = CONFIG.TARGET_FULL_GAJI - hadirValid;
         const potonganPerHari = gajiPokok / CONFIG.TARGET_FULL_GAJI;
         totalPotongan = kekurangan * potonganPerHari;
         totalGaji = gajiPokok - totalPotongan;
     }
 
-    // Logika 3: Bonus jika hadir sempurna (6/6)
-    if (jumlahHadir >= CONFIG.TARGET_HADIR) {
+    // Bonus hadir sempurna (6/6)
+    if (hadirValid >= CONFIG.TARGET_HADIR) {
         totalGaji += CONFIG.BONUS_RAJIN;
     }
 
