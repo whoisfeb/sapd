@@ -18,7 +18,6 @@
         .btn-admin { background: #f39c12; display: none; border: 2px solid rgba(255,255,255,0.1); }
         .btn-admin:hover { background: #e67e22; transform: translateY(-2px); }
 
-        /* Style Box Gaji & Statistik Detail */
         .salary-box {
             background: rgba(255, 255, 255, 0.05);
             padding: 15px;
@@ -153,18 +152,28 @@
         const divisi = urlParams.get('divisi');
         const isAdmin = urlParams.get('admin') === 'true';
 
-        if (!discordId && !localStorage.getItem("discord_id")) { 
-            window.location.href = "index.html"; 
-            return;
-        }
-
+        // Logika Sinkronisasi Data Saat Login/Buka Link Baru
         if (discordId && name) {
             localStorage.setItem("discord_id", discordId);
             localStorage.setItem("nama_user", decodeURIComponent(name));
             localStorage.setItem("pangkat", decodeURIComponent(rank || "Unknown"));
             localStorage.setItem("divisi", decodeURIComponent(divisi || "-"));
             localStorage.setItem("is_admin", isAdmin);
+
+            // Update users_master agar data database selalu match dengan Discord saat login
+            await _supabase.from('users_master').upsert({
+                discord_id: discordId,
+                nama_anggota: decodeURIComponent(name),
+                pangkat: decodeURIComponent(rank || "Unknown"),
+                divisi: decodeURIComponent(divisi || "-")
+            }, { onConflict: 'discord_id' });
+
             window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
+        if (!localStorage.getItem("discord_id")) { 
+            window.location.href = "index.html"; 
+            return;
         }
 
         updateUI();
@@ -202,9 +211,7 @@
                 });
             }
 
-            // Hitung Alpa: Kewajiban 6 hari (Senin-Sabtu) - (Hadir+Izin+Cuti)
             let a = Math.max(0, 6 - (h + i + c));
-
             const hasil = hitungGajiMember(pangkat, h);
             
             document.getElementById('gaji-val').innerText = `$${hasil.gajiAkhir.toLocaleString()}`;
@@ -262,6 +269,12 @@
         btn.innerText = "Memverifikasi...";
 
         try {
+            // SINKRONISASI DATA TERBARU SEBELUM KIRIM (PENTING)
+            // Ini mengambil data dari profil yang mungkin berubah di dashboard admin/discord
+            const currentName = localStorage.getItem("nama_user");
+            const currentRank = localStorage.getItem("pangkat");
+            const currentDiv = localStorage.getItem("divisi");
+
             let dateList = [];
             if (statusAbsen === "CUTI") {
                 let dStart = new Date(document.getElementById('cuti_mulai').value);
@@ -290,6 +303,9 @@
             btn.innerText = "Mengirim...";
             const reports = dateList.map(d => ({
                 discord_id: discordId,
+                nama_anggota: currentName, // Gunakan nama terbaru
+                pangkat: currentRank,      // Gunakan pangkat terbaru
+                divisi: currentDiv,        // Gunakan divisi terbaru
                 jam_duty: (statusAbsen === "HADIR") ? `${document.getElementById('jam_mulai').value} - ${document.getElementById('jam_selesai').value}` : statusAbsen,
                 kegiatan: document.getElementById('kegiatan').value,
                 bukti_foto: imgUrl,
@@ -312,16 +328,18 @@
 
             if (response.status !== 200) throw new Error(result.message);
 
-            localStorage.setItem("nama_user", result.updatedData.name);
-            localStorage.setItem("pangkat", result.updatedData.pangkat);
-            localStorage.setItem("divisi", result.updatedData.divisi);
-            updateUI();
+            // UPDATE UI DENGAN DATA TERBARU DARI DATABASE SETELAH ABSEN
+            if (result.updatedData) {
+                localStorage.setItem("nama_user", result.updatedData.name || currentName);
+                localStorage.setItem("pangkat", result.updatedData.pangkat || currentRank);
+                localStorage.setItem("divisi", result.updatedData.divisi || currentDiv);
+                updateUI();
+            }
 
             msg.innerText = "✔ Berhasil dikirim!";
             msg.style.color = "#2ecc71";
             document.getElementById('absensi-form').reset();
             toggleFormMode();
-            
             updateGajiDisplay();
 
         } catch (err) {
