@@ -19,7 +19,7 @@ function checkAuth() {
         document.getElementById('label-minggu').innerText = `${mon.toLocaleDateString('id-ID')} - ${sun.toLocaleDateString('id-ID')}`;
 
         // Pastikan mengambil bukti_gambar dari tabel
-        const { data: logs } = await _supabase.from('absensi_sasg').select('*').gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+        const { data: logs } = await _supabase.from('absensi_sapd').select('*').gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
         const { data: masters } = await _supabase.from('users_master').select('*');
 
         masters.sort((a, b) => (RANK_ORDER[a.pangkat.toUpperCase()] || 99) - (RANK_ORDER[b.pangkat.toUpperCase()] || 99));
@@ -257,14 +257,14 @@ function checkAuth() {
     async function resetUser(id) {
         if (!confirm("Hapus data absensi & bukti gambar anggota ini di minggu ini?")) return;
         const { mon, sun } = getWeekRange(currentWeekOffset);
-        const { data: logs } = await _supabase.from('absensi_sasg').select('bukti_gambar').eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+        const { data: logs } = await _supabase.from('absensi_sapd').select('bukti_gambar').eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
         if (logs && logs.length > 0) {
             const filesToRemove = logs.map(log => log.bukti_gambar ? `absensi/${log.bukti_gambar}` : null).filter(path => path !== null);
             if (filesToRemove.length > 0) {
                 await _supabase.storage.from('bukti-absen').remove(filesToRemove);
             }
         }
-        await _supabase.from('absensi_sasg').delete().eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+        await _supabase.from('absensi_sapd').delete().eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
         alert("Data dan Gambar berhasil dihapus!");
         loadData();
     }
@@ -272,14 +272,14 @@ function checkAuth() {
     async function resetAllWeeklyData() {
         if (!confirm("Hapus SEMUA data absensi & bukti gambar minggu ini?")) return;
         const { mon, sun } = getWeekRange(currentWeekOffset);
-        const { data: allLogs } = await _supabase.from('absensi_sasg').select('bukti_gambar').gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+        const { data: allLogs } = await _supabase.from('absensi_sapd').select('bukti_gambar').gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
         if (allLogs && allLogs.length > 0) {
             const filesToRemove = allLogs.map(log => log.bukti_gambar ? `absensi/${log.bukti_gambar}` : null).filter(path => path !== null);
             if (filesToRemove.length > 0) {
                 await _supabase.storage.from('bukti-absen').remove(filesToRemove);
             }
         }
-        await _supabase.from('absensi_sasg').delete().gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+        await _supabase.from('absensi_sapd').delete().gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
         alert("Seluruh data dan gambar minggu ini telah dibersihkan!");
         loadData();
     }
