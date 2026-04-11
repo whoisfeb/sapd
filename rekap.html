@@ -135,11 +135,11 @@
     }
 
     async function sendWarning(discord_id, nama_anggota, pangkat_anggota, currentWarn) {
-        const adminName = prompt("Masukkan Nama Admin pemberi SP:");
-        const adminRank = prompt("Masukkan Pangkat Admin pemberi SP:");
-        if (!adminName || !adminRank) return alert("Data Admin harus diisi!");
+        // OTOMATIS AMBIL DARI LOCAL STORAGE
+        const adminName = localStorage.getItem("admin_nama") || "High Command";
+        const adminRank = localStorage.getItem("admin_pangkat") || "Staff";
 
-        if (!confirm(`Kirim SP-${currentWarn + 1} ke Discord?`)) return;
+        if (!confirm(`Kirim SP-${currentWarn + 1} ke Discord? (Oleh: ${adminName})`)) return;
         
         const { mon } = getWeekRange(currentWeekOffset);
         const u = userWeekly[discord_id];
@@ -158,7 +158,7 @@
             "embeds": [{
                 "title": `📋 SURAT PERINGATAN (SP - ${newWarnCount})`,
                 "color": 15285324,
-                "description": `**Tanggal:** ${new Date().toLocaleDateString('id-ID')}\n**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat:** ${pangkat_anggota}\n\n**Alasan Peringatan:**\nTidak memenuhi syarat kehadiran mingguan.\nDetail Bolos:\n${daftarBolos.join('\n')}\n**Total SP:** ${newWarnCount}\n\n**Pemberi Peringatan:** ${adminName}\n**Pangkat:** ${adminRank}`,
+                "description": `**Tanggal:** ${new Date().toLocaleDateString('id-ID')}\n**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat:** ${pangkat_anggota}\n\n**Alasan Peringatan:**\nTidak memenuhi syarat kehadiran mingguan.\nDetail Bolos:\n${daftarBolos.join('\n')}\n**Total SP:** ${newWarnCount}\n\n**Pemberi Peringatan (HC):** ${adminName}\n**Pangkat:** ${adminRank}`,
                 "timestamp": new Date()
             }]
         };
@@ -168,15 +168,15 @@
             method: 'POST', 
             body: JSON.stringify({ payload: logPayload, updateList: await updateDiscordList() }) 
         });
-        if (res.ok) { alert("SP Terkirim!"); loadData(); }
+        if (res.ok) { alert("SP Terhasil Dikirim!"); loadData(); }
     }
 
     async function removeWarning(discord_id, nama_anggota, pangkat_anggota, currentWarn) {
-        const adminName = prompt("Masukkan Nama Admin pencabut SP:");
-        const adminRank = prompt("Masukkan Pangkat Admin pencabut SP:");
-        if (!adminName || !adminRank) return alert("Data Admin harus diisi!");
+        // OTOMATIS AMBIL DARI LOCAL STORAGE
+        const adminName = localStorage.getItem("admin_nama") || "High Command";
+        const adminRank = localStorage.getItem("admin_pangkat") || "Staff";
 
-        if (!confirm(`Cabut SP untuk ${nama_anggota}?`)) return;
+        if (!confirm(`Cabut SP untuk ${nama_anggota}? (Oleh: ${adminName})`)) return;
         const newWarnCount = Math.max(0, currentWarn - 1);
 
         const logPayload = {
@@ -184,7 +184,7 @@
             "embeds": [{
                 "title": `🔓 PENCABUTAN SURAT PERINGATAN`,
                 "color": 3066993,
-                "description": `**Tanggal:** ${new Date().toLocaleDateString('id-ID')}\n**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat Anggota:** ${pangkat_anggota}\n\n**Status:** 1 SP telah dicabut.\n**Sisa SP:** ${newWarnCount}\n\n**Dicabut Oleh:** ${adminName}\n**Pangkat Admin:** ${adminRank}`,
+                "description": `**Tanggal:** ${new Date().toLocaleDateString('id-ID')}\n**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat Anggota:** ${pangkat_anggota}\n\n**Status:** 1 SP telah dicabut.\n**Sisa SP:** ${newWarnCount}\n\n**Dicabut Oleh (HC):** ${adminName}\n**Pangkat Admin:** ${adminRank}`,
                 "timestamp": new Date()
             }]
         };
