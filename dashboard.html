@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SAPD Dashboard - Panel Anggota</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
     <style>
         :root { --primary: #e94560; --bg: #1a1a2e; --card: #16213e; --text: #ffffff; --success: #2ecc71; }
         body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
@@ -16,6 +17,20 @@
         .btn-logout { background: #444; }
         .btn-admin { background: #f39c12; display: none; border: 2px solid rgba(255,255,255,0.1); }
         .btn-admin:hover { background: #e67e22; transform: translateY(-2px); }
+
+        /* Style Baru Box Gaji */
+        .salary-box {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid var(--success);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .salary-info div { font-size: 0.75em; color: #aaa; margin-bottom: 2px; }
+        .salary-amount { font-size: 1.2em; font-weight: bold; color: var(--success); }
 
         h2 { text-align: center; margin: 10px 0 5px 0; text-transform: uppercase; }
         h4 { text-align: center; color: #888; font-weight: normal; margin-bottom: 25px; border-bottom: 1px solid #30475e; padding-bottom: 15px; }
@@ -44,6 +59,14 @@
     <div id="dashboard-content">
         <h2 id="name-display">Memuat...</h2>
         <h4 id="rank-display">Pangkat | Divisi</h4>
+
+        <div class="salary-box">
+            <div class="salary-info">
+                <div>Estimasi Gaji Minggu Ini</div>
+                <div id="hadir-count">Hadir: 0/6 Hari</div>
+            </div>
+            <div class="salary-amount" id="gaji-val">$0</div>
+        </div>
 
         <form id="absensi-form">
             <div class="form-group">
@@ -97,7 +120,7 @@
 <script>
     const _supabase = window.supabase.createClient("https://urclmvdkfkfwvdascobs.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4");
 
-    window.onload = () => {
+    window.onload = async () => {
         const urlParams = new URLSearchParams(window.location.search);
         const discordId = urlParams.get('id');
         const name = urlParams.get('name');
@@ -121,6 +144,7 @@
 
         updateUI();
         toggleFormMode();
+        updateGajiDisplay(); // Ambil data gaji saat load
     };
 
     function updateUI() {
@@ -129,6 +153,34 @@
         if (localStorage.getItem("is_admin") === "true") {
             document.getElementById('admin-link').style.display = 'block';
         }
+    }
+
+    // Fungsi Hitung Gaji Personal
+    async function updateGajiDisplay() {
+        const discId = localStorage.getItem("discord_id");
+        const pangkat = localStorage.getItem("pangkat");
+        
+        // Cari Senin minggu ini
+        const d = new Date();
+        const day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6:1);
+        const monday = new Date(d.setDate(diff));
+        monday.setHours(0,0,0,0);
+
+        try {
+            const { data: logs } = await _supabase.from('absensi_sapd').select('jam_duty').eq('discord_id', discId).gte('created_at', monday.toISOString());
+            
+            let hadir = 0;
+            if (logs) {
+                logs.forEach(l => {
+                    const ket = (l.jam_duty || "").toUpperCase();
+                    if (!ket.includes("IZIN") && !ket.includes("CUTI")) hadir++;
+                });
+            }
+
+            const hasil = hitungGajiMember(pangkat, hadir);
+            document.getElementById('hadir-count').innerText = `Hadir: ${hadir}/6 Hari`;
+            document.getElementById('gaji-val').innerText = `$${hasil.gajiAkhir.toLocaleString()}`;
+        } catch (err) { console.error(err); }
     }
 
     function toggleFormMode() {
@@ -143,38 +195,20 @@
         const cutiMulai = document.getElementById('cuti_mulai');
         const cutiSelesai = document.getElementById('cuti_selesai');
 
-        tglInput.value = "";
-        cutiMulai.value = "";
-        cutiSelesai.value = "";
-        tglInput.removeAttribute('min');
-        tglInput.removeAttribute('max');
-        cutiMulai.removeAttribute('min');
-        cutiSelesai.removeAttribute('min');
+        tglInput.value = ""; cutiMulai.value = ""; cutiSelesai.value = "";
+        tglInput.removeAttribute('min'); tglInput.removeAttribute('max');
+        cutiMulai.removeAttribute('min'); cutiSelesai.removeAttribute('min');
 
         if (status === "HADIR") {
-            singleSec.style.display = "block";
-            rangeSec.style.display = "none";
-            hadirSec.style.display = "block";
-            tglInput.max = today; 
-            tglInput.required = true;
-            fileInput.required = true;
+            singleSec.style.display = "block"; rangeSec.style.display = "none"; hadirSec.style.display = "block";
+            tglInput.max = today; tglInput.required = true; fileInput.required = true;
         } else if (status === "IZIN") {
-            singleSec.style.display = "block";
-            rangeSec.style.display = "none";
-            hadirSec.style.display = "none";
-            tglInput.min = today; 
-            tglInput.required = true;
-            fileInput.required = false;
+            singleSec.style.display = "block"; rangeSec.style.display = "none"; hadirSec.style.display = "none";
+            tglInput.min = today; tglInput.required = true; fileInput.required = false;
         } else if (status === "CUTI") {
-            singleSec.style.display = "none";
-            rangeSec.style.display = "block";
-            hadirSec.style.display = "none";
-            cutiMulai.min = today;
-            cutiSelesai.min = today;
-            tglInput.required = false;
-            cutiMulai.required = true;
-            cutiSelesai.required = true;
-            fileInput.required = false;
+            singleSec.style.display = "none"; rangeSec.style.display = "block"; hadirSec.style.display = "none";
+            cutiMulai.min = today; cutiSelesai.min = today;
+            tglInput.required = false; cutiMulai.required = true; cutiSelesai.required = true; fileInput.required = false;
         }
     }
 
@@ -246,7 +280,6 @@
 
             if (response.status !== 200) throw new Error(result.message);
 
-            // Update data lokal jika ada perubahan dari server
             localStorage.setItem("nama_user", result.updatedData.name);
             localStorage.setItem("pangkat", result.updatedData.pangkat);
             localStorage.setItem("divisi", result.updatedData.divisi);
@@ -256,6 +289,9 @@
             msg.style.color = "#2ecc71";
             document.getElementById('absensi-form').reset();
             toggleFormMode();
+            
+            // Update Gaji setelah berhasil kirim
+            updateGajiDisplay();
 
         } catch (err) {
             msg.innerText = "❌ " + err.message;
