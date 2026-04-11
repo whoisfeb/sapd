@@ -121,7 +121,7 @@
 
         userWeekly = {}; 
         masters.forEach(m => {
-            userWeekly[m.discord_id] = { info: m, days: { 1:null, 2:null, 3:null, 4:null, 5:null, 6:null }, totalHadir: 0 };
+            userWeekly[m.discord_id] = { info: { ...m }, days: { 1:null, 2:null, 3:null, 4:null, 5:null, 6:null }, totalHadir: 0 };
         });
 
         logs.forEach(log => {
@@ -130,6 +130,10 @@
                 const ket = (log.jam_duty || "").toUpperCase();
                 userWeekly[log.discord_id].days[d] = { ket: ket };
                 if (!ket.includes("IZIN") && !ket.includes("CUTI")) userWeekly[log.discord_id].totalHadir++;
+                
+                // SINKRONISASI: Gunakan data terbaru dari log jika ada perubahan nama/pangkat
+                if (log.nama_anggota) userWeekly[log.discord_id].info.nama_anggota = log.nama_anggota;
+                if (log.pangkat) userWeekly[log.discord_id].info.pangkat = log.pangkat;
             }
         });
 
@@ -137,14 +141,14 @@
 
         document.getElementById('tbody-weekly').innerHTML = masters.map(m => {
             const u = userWeekly[m.discord_id];
+            const memberInfo = u.info; // Data terbaru hasil sinkronisasi log
             
-            // Menggunakan fungsi hitungGajiMember dari config.js
-            const hasilGaji = hitungGajiMember(m.pangkat, u.totalHadir);
+            const hasilGaji = hitungGajiMember(memberInfo.pangkat, u.totalHadir);
             const totalGaji = hasilGaji.gajiAkhir;
 
             totalGajiSemua += totalGaji;
 
-            const cWarn = m.total_warning || 0;
+            const cWarn = memberInfo.total_warning || 0;
             const getIcon = (idx) => {
                 const data = u.days[idx];
                 if (!data) return `<span class="cross-icon">✘</span>`;
@@ -157,18 +161,18 @@
             const currentAdminRank = localStorage.getItem("pangkat");
 
             return `<tr>
-                <td style="text-align:left;"><b>${m.nama_anggota}</b></td>
-                <td>${m.pangkat}</td>
+                <td style="text-align:left;"><b>${memberInfo.nama_anggota}</b></td>
+                <td>${memberInfo.pangkat}</td>
                 ${[1,2,3,4,5,6].map(i => `<td>${getIcon(i)}</td>`).join('')}
                 <td>${u.totalHadir}/6</td>
                 <td class="salary-text">$${totalGaji.toLocaleString()}</td>
                 <td>
                     <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
-                        <button class="btn-warning" onclick="sendWarning('${m.discord_id}', '${m.nama_anggota}', '${m.pangkat}', ${cWarn}, '${currentAdminName}', '${currentAdminRank}')">⚠️ Warning (${cWarn})</button>
-                        ${cWarn > 0 ? `<span class="unwarn-link" onclick="removeWarning('${m.discord_id}', '${m.nama_anggota}', '${m.pangkat}', ${cWarn}, '${currentAdminName}', '${currentAdminRank}')">[ Cabut SP ]</span>` : ''}
+                        <button class="btn-warning" onclick="sendWarning('${memberInfo.discord_id}', '${memberInfo.nama_anggota}', '${memberInfo.pangkat}', ${cWarn}, '${currentAdminName}', '${currentAdminRank}')">⚠️ Warning (${cWarn})</button>
+                        ${cWarn > 0 ? `<span class="unwarn-link" onclick="removeWarning('${memberInfo.discord_id}', '${memberInfo.nama_anggota}', '${memberInfo.pangkat}', ${cWarn}, '${currentAdminName}', '${currentAdminRank}')">[ Cabut SP ]</span>` : ''}
                     </div>
                 </td>
-                <td><button onclick="resetUser('${m.discord_id}')" style="background:none;border:none;cursor:pointer;">🗑</button></td>
+                <td><button onclick="resetUser('${memberInfo.discord_id}')" style="background:none;border:none;cursor:pointer;">🗑</button></td>
             </tr>`;
         }).join('');
 
