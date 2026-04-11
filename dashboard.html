@@ -57,7 +57,7 @@
 
             <div class="form-group" id="single-date-section">
                 <label id="label-tanggal">Tanggal</label>
-                <input type="date" id="tanggal_absen">
+                <input type="date" id="tanggal_absen" required>
             </div>
 
             <div class="form-group" id="range-date-section" style="display:none;">
@@ -95,9 +95,9 @@
 </div>
 
 <script>
+    // Konfigurasi Supabase
     const _supabase = window.supabase.createClient("https://urclmvdkfkfwvdascobs.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4");
 
-    // --- LOGIKA PENYIMPANAN SESI (PENTING) ---
     window.onload = () => {
         const urlParams = new URLSearchParams(window.location.search);
         const discordId = urlParams.get('id');
@@ -106,35 +106,33 @@
         const divisi = urlParams.get('divisi');
         const isAdmin = urlParams.get('admin') === 'true';
 
-        // Jika tidak ada ID, tendang ke login
+        // Proteksi Sesi
         if (!discordId && !localStorage.getItem("discord_id")) { 
             window.location.href = "index.html"; 
             return;
         }
 
-        // Jika user baru datang dari redirect login (URL punya data)
+        // Simpan Sesi jika baru login
         if (discordId && name) {
             localStorage.setItem("discord_id", discordId);
             localStorage.setItem("nama_user", decodeURIComponent(name));
             localStorage.setItem("pangkat", decodeURIComponent(rank || "Unknown"));
             localStorage.setItem("divisi", decodeURIComponent(divisi || "-"));
             localStorage.setItem("is_admin", isAdmin);
-            
-            // Bersihkan URL agar rapi
             window.history.replaceState({}, document.title, window.location.pathname);
         }
 
-        // Update UI Dashboard
+        updateUI();
+        toggleFormMode();
+    };
+
+    function updateUI() {
         document.getElementById('name-display').innerText = localStorage.getItem("nama_user");
         document.getElementById('rank-display').innerText = `${localStorage.getItem("pangkat")} | ${localStorage.getItem("divisi")}`;
-        
-        // Tampilkan tombol rekap jika admin
         if (localStorage.getItem("is_admin") === "true") {
             document.getElementById('admin-link').style.display = 'block';
         }
-        
-        toggleFormMode();
-    };
+    }
 
     function toggleFormMode() {
         const status = document.getElementById('status_absen').value;
@@ -143,26 +141,29 @@
         const singleSec = document.getElementById('single-date-section');
         const rangeSec = document.getElementById('range-date-section');
         const fileInput = document.getElementById('bukti_foto');
+        const tglInput = document.getElementById('tanggal_absen');
 
         if (status === "CUTI") {
             singleSec.style.display = "none";
             rangeSec.style.display = "block";
             hadirSec.style.display = "none";
-            document.getElementById('cuti_mulai').min = today;
-            document.getElementById('cuti_selesai').min = today;
+            tglInput.required = false;
+            document.getElementById('cuti_mulai').required = true;
+            document.getElementById('cuti_selesai').required = true;
             fileInput.required = false;
         } else {
             singleSec.style.display = "block";
             rangeSec.style.display = "none";
-            const inputTgl = document.getElementById('tanggal_absen');
+            tglInput.required = true;
+            document.getElementById('cuti_mulai').required = false;
+            document.getElementById('cuti_selesai').required = false;
+            
             if (status === "HADIR") {
-                inputTgl.max = today; 
-                inputTgl.removeAttribute('min');
+                tglInput.max = today; 
                 hadirSec.style.display = "block";
                 fileInput.required = true;
             } else {
-                inputTgl.min = today; 
-                inputTgl.removeAttribute('max');
+                tglInput.removeAttribute('max');
                 hadirSec.style.display = "none";
                 fileInput.required = false;
             }
@@ -184,19 +185,17 @@
         const discordId = localStorage.getItem("discord_id");
         
         btn.disabled = true;
-        btn.innerText = "Memvalidasi Identitas...";
+        btn.innerText = "Memverifikasi Role & Identitas...";
+        msg.innerText = "";
 
         try {
-            // 1. CEK IDENTITAS TERBARU
-            const { data: userUpdate, error: errUser } = await _supabase
-                .from('users_master').select('*').eq('discord_id', discordId).single();
-            if (errUser) throw new Error("Gagal verifikasi data master.");
-
-            // 2. LOGIKA TANGGAL
+            // 1. Generate List Tanggal
             let dateList = [];
             if (statusAbsen === "CUTI") {
                 let dStart = new Date(document.getElementById('cuti_mulai').value);
                 let dEnd = new Date(document.getElementById('cuti_selesai').value);
+                if (dEnd < dStart) throw new Error("Tanggal selesai tidak boleh sebelum tanggal mulai.");
+                
                 for (let d = new Date(dStart); d <= dEnd; d.setDate(d.getDate() + 1)) {
                     if (d.getDay() !== 0) dateList.push(new Date(d));
                 }
@@ -206,41 +205,61 @@
                 dateList.push(tglVal);
             }
 
-            if (dateList.length === 0) throw new Error("Tidak ada tanggal valid.");
+            if (dateList.length === 0) throw new Error("Tidak ada tanggal kerja valid (Minggu dilewati).");
 
-            // 3. UPLOAD FOTO
+            // 2. Upload Foto ke Storage
             let imgUrl = "N/A";
             const file = document.getElementById('bukti_foto').files[0];
             if (statusAbsen === "HADIR" && file) {
                 btn.innerText = "Mengunggah Foto...";
                 const path = `absensi/${Date.now()}_${discordId}.png`;
-                await _supabase.storage.from('bukti-absen').upload(path, file);
+                const { error: upErr } = await _supabase.storage.from('bukti-absen').upload(path, file);
+                if (upErr) throw upErr;
                 imgUrl = _supabase.storage.from('bukti-absen').getPublicUrl(path).data.publicUrl;
             }
 
-            // 4. INSERT DATA
-            btn.innerText = "Mengirim Laporan...";
+            // 3. Kirim ke Backend (submit-absensi.js)
+            btn.innerText = "Sinkronisasi & Mengirim...";
+            
             const reports = dateList.map(d => ({
                 discord_id: discordId,
-                nama_anggota: userUpdate.nama_anggota,
-                pangkat: userUpdate.pangkat,
-                divisi: userUpdate.divisi,
                 jam_duty: (statusAbsen === "HADIR") ? `${document.getElementById('jam_mulai').value} - ${document.getElementById('jam_selesai').value}` : statusAbsen,
                 kegiatan: document.getElementById('kegiatan').value,
                 bukti_foto: imgUrl,
                 created_at: d.toISOString()
             }));
 
-            const { error: errIns } = await _supabase.from('absensi_sapd').insert(reports);
-            if (errIns) throw errIns;
+            const response = await fetch('/.netlify/functions/submit-absensi', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(reports)
+            });
 
-            msg.innerText = "✔ Berhasil Terkirim!";
+            const result = await response.json();
+
+            // Handle jika di-kick (403)
+            if (response.status === 403) {
+                alert("AKSES DICABUT: Anda tidak lagi memiliki Role SAPD di Discord!");
+                localStorage.clear();
+                window.location.href = "index.html";
+                return;
+            }
+
+            if (response.status !== 200) throw new Error(result.message || "Gagal mengirim.");
+
+            // Update Local Storage dengan data terbaru dari hasil sync Discord
+            localStorage.setItem("nama_user", result.updatedData.name);
+            localStorage.setItem("pangkat", result.updatedData.pangkat);
+            localStorage.setItem("divisi", result.updatedData.divisi);
+            updateUI();
+
+            msg.innerText = "✔ Berhasil! Laporan terkirim & identitas sinkron.";
             msg.style.color = "#2ecc71";
             document.getElementById('absensi-form').reset();
             toggleFormMode();
 
         } catch (err) {
-            msg.innerText = "Gagal: " + err.message;
+            msg.innerText = "❌ " + err.message;
             msg.style.color = "#e94560";
         } finally {
             btn.disabled = false;
@@ -248,5 +267,6 @@
         }
     });
 </script>
+
 </body>
 </html>
