@@ -1,5 +1,4 @@
-
-    function checkAuth() {
+function checkAuth() {
         const isAdmin = localStorage.getItem("is_admin");
         if (isAdmin !== "true") {
             alert("AKSES DITOLAK: Halaman ini hanya untuk High Command (Admin).");
@@ -27,71 +26,68 @@
 
         userWeekly = {}; 
         masters.forEach(m => {
-            // SINKRONISASI: Kita gunakan data dari users_master sebagai info utama
             userWeekly[m.discord_id] = { 
                 info: m, 
                 days: { 1:null, 2:null, 3:null, 4:null, 5:null, 6:null }, 
                 totalHadir: 0,
-                // TAMBAHKAN INI: Untuk mencatat tanggal unik
                 uniqueDates: new Set() 
             };
         });
 
         logs.forEach(log => {
-    const d = new Date(log.created_at).getDay();
-    const dateKey = new Date(log.created_at).toISOString().split('T')[0];
-    const discordId = log.discord_id;
+            const d = new Date(log.created_at).getDay();
+            const dateKey = new Date(log.created_at).toISOString().split('T')[0];
+            const discordId = log.discord_id;
 
-    if (userWeekly[discordId] && d !== 0) {
-        const ket = (log.jam_duty || "").toUpperCase();
-        
-        // SIMPAN DATA bukti_gambar KE DALAM OBYEK HARI
-        userWeekly[discordId].days[d] = { 
-            ket: ket,
-            bukti_gambar: log.bukti_gambar // Baris ini sangat penting
-        };
+            if (userWeekly[discordId] && d !== 0) {
+                const ket = (log.jam_duty || "").toUpperCase();
+                
+                // Inisialisasi jika hari ini belum ada data
+                if (!userWeekly[discordId].days[d]) {
+                    userWeekly[discordId].days[d] = { ket: ket, bukti_list: [] };
+                }
+                
+                // Masukkan gambar ke dalam list (array) untuk popup
+                if (log.bukti_gambar) {
+                    userWeekly[discordId].days[d].bukti_list.push(log.bukti_gambar);
+                }
 
-        if (!ket.includes("IZIN") && !ket.includes("CUTI")) {
-            if (!userWeekly[discordId].uniqueDates.has(dateKey)) {
-                userWeekly[discordId].totalHadir++; 
-                userWeekly[discordId].uniqueDates.add(dateKey); 
+                if (!ket.includes("IZIN") && !ket.includes("CUTI")) {
+                    if (!userWeekly[discordId].uniqueDates.has(dateKey)) {
+                        userWeekly[discordId].totalHadir++; 
+                        userWeekly[discordId].uniqueDates.add(dateKey); 
+                    }
+                }
             }
-        }
-    }
-});
+        });
+
         let totalGajiSemua = 0;
 
         document.getElementById('tbody-weekly').innerHTML = masters.map(m => {
             const u = userWeekly[m.discord_id];
-            
-            // Menggunakan data Pangkat dari users_master agar selalu terbaru
             const hasilGaji = hitungGajiMember(m.pangkat, u.totalHadir);
             const totalGaji = hasilGaji.gajiAkhir;
 
             totalGajiSemua += totalGaji;
-
             const cWarn = m.total_warning || 0;
+
+            // Fungsi internal untuk merender ikon per kolom hari
             const getIcon = (idx) => {
-    const data = u.days[idx];
-    if (!data) return `<span class="cross-icon">✘</span>`;
-    
-    // Jika statusnya Izin atau Cuti
-    if (data.ket.includes("IZIN")) return `<span class="status-ic">I</span>`;
-    if (data.ket.includes("CUTI")) return `<span class="status-ic">C</span>`;
-    
-    // Jika statusnya Hadir dan memiliki bukti gambar
-    if (data.bukti_gambar) {
-        // Link mengarah ke folder 'absensi' di dalam bucket 'bukti-absen'
-        const imageUrl = `https://urclmvdkfkfwvdascobs.supabase.co/storage/v1/object/public/bukti-absen/absensi/${data.bukti_gambar}`;
-        
-        return `<a href="${imageUrl}" target="_blank" title="Klik untuk lihat bukti foto" style="text-decoration:none;">
-                    <span class="check-icon" style="cursor:pointer;">✔</span>
-                </a>`;
-    }
-    
-    // Jika hadir tapi tidak ada data gambar di database
-    return `<span class="check-icon">✔</span>`;
-};
+                const data = u.days[idx];
+                if (!data) return `<span class="cross-icon">✘</span>`;
+                
+                if (data.ket.includes("IZIN")) return `<span class="status-ic">I</span>`;
+                if (data.ket.includes("CUTI")) return `<span class="status-ic">C</span>`;
+                
+                // Jika ada bukti gambar, buat ikon centang bisa diklik untuk popup
+                if (data.bukti_list && data.bukti_list.length > 0) {
+                    const listGambar = JSON.stringify(data.bukti_list);
+                    return `<span class="check-icon" style="cursor:pointer; text-decoration:underline;" onclick='showImagePopup(${listGambar})'>✔</span>`;
+                }
+                
+                return `<span class="check-icon">✔</span>`;
+            };
+
             const currentAdminName = localStorage.getItem("nama_user");
             const currentAdminRank = localStorage.getItem("pangkat");
 
@@ -112,6 +108,34 @@
         }).join('');
 
         document.getElementById('total-gaji-global').innerText = `$${totalGajiSemua.toLocaleString()}`;
+    }
+
+    // FUNGSI UNTUK MENAMPILKAN POPUP GAMBAR
+    function showImagePopup(images) {
+        let modal = document.getElementById("imageModal");
+        if (!modal) {
+            modal = document.createElement("div");
+            modal.id = "imageModal";
+            modal.innerHTML = `
+                <div style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10000; display:flex; justify-content:center; align-items:center;">
+                    <div style="background:#1a1a2e; padding:20px; border-radius:10px; max-width:90%; max-height:90%; overflow-y:auto; position:relative; border:2px solid #30475e;">
+                        <button onclick="document.getElementById('imageModal').remove()" style="position:absolute; top:10px; right:10px; background:#e94562; color:white; border:none; cursor:pointer; padding:5px 12px; border-radius:5px; font-weight:bold;">TUTUP</button>
+                        <h3 style="color:white; margin-bottom:15px; border-bottom:1px solid #30475e; padding-bottom:10px;">Bukti Dokumentasi</h3>
+                        <div id="modalContent" style="display:flex; flex-wrap:wrap; gap:15px; justify-content:center;"></div>
+                    </div>
+                </div>`;
+            document.body.appendChild(modal);
+        }
+
+        const content = document.getElementById("modalContent");
+        content.innerHTML = images.map(img => `
+            <div style="text-align:center;">
+                <img src="https://urclmvdkfkfwvdascobs.supabase.co/storage/v1/object/public/bukti-absen/absensi/${img}" 
+                     style="max-width:350px; width:100%; border-radius:5px; border:1px solid #0f3460;">
+                <br>
+                <a href="https://urclmvdkfkfwvdascobs.supabase.co/storage/v1/object/public/bukti-absen/absensi/${img}" target="_blank" style="color:#00d2ff; font-size:12px; text-decoration:none;">Buka Full Size</a>
+            </div>
+        `).join('');
     }
 
     async function sendWarning(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank) {
@@ -231,72 +255,32 @@
     
     async function resetUser(id) {
         if (!confirm("Hapus data absensi & bukti gambar anggota ini di minggu ini?")) return;
-        
         const { mon, sun } = getWeekRange(currentWeekOffset);
-    
-        // 1. Ambil daftar bukti_gambar dari tabel
-        const { data: logs } = await _supabase
-            .from('absensi_sapd')
-            .select('bukti_gambar')
-            .eq('discord_id', id)
-            .gte('created_at', mon.toISOString())
-            .lte('created_at', sun.toISOString());
-    
+        const { data: logs } = await _supabase.from('absensi_sapd').select('bukti_gambar').eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+        
         if (logs && logs.length > 0) {
-            // Pastikan path menyertakan nama folder 'absensi/' sesuai di screenshot storage
-            const filesToRemove = logs
-                .map(log => log.bukti_gambar ? `absensi/${log.bukti_gambar}` : null)
-                .filter(path => path !== null);
-    
+            const filesToRemove = logs.map(log => log.bukti_gambar ? `absensi/${log.bukti_gambar}` : null).filter(path => path !== null);
             if (filesToRemove.length > 0) {
-                // Hapus dari bucket 'bukti-absen'
-                await _supabase.storage
-                    .from('bukti-absen') 
-                    .remove(filesToRemove);
+                await _supabase.storage.from('bukti-absen').remove(filesToRemove);
             }
         }
-    
-        // 2. Hapus data di database
-        await _supabase.from('absensi_sapd')
-            .delete()
-            .eq('discord_id', id)
-            .gte('created_at', mon.toISOString())
-            .lte('created_at', sun.toISOString());
-    
+        await _supabase.from('absensi_sapd').delete().eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
         alert("Data dan Gambar di folder absensi berhasil dihapus!");
         loadData();
     }
 
     async function resetAllWeeklyData() {
         if (!confirm("Hapus SEMUA data absensi & bukti gambar minggu ini?")) return;
-        
         const { mon, sun } = getWeekRange(currentWeekOffset);
-    
-        // 1. Ambil semua bukti_gambar minggu ini
-        const { data: allLogs } = await _supabase
-            .from('absensi_sapd')
-            .select('bukti_gambar')
-            .gte('created_at', mon.toISOString())
-            .lte('created_at', sun.toISOString());
-    
+        const { data: allLogs } = await _supabase.from('absensi_sapd').select('bukti_gambar').gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+        
         if (allLogs && allLogs.length > 0) {
-            const filesToRemove = allLogs
-                .map(log => log.bukti_gambar ? `absensi/${log.bukti_gambar}` : null)
-                .filter(path => path !== null);
-    
+            const filesToRemove = allLogs.map(log => log.bukti_gambar ? `absensi/${log.bukti_gambar}` : null).filter(path => path !== null);
             if (filesToRemove.length > 0) {
-                await _supabase.storage
-                    .from('bukti-absen')
-                    .remove(filesToRemove);
+                await _supabase.storage.from('bukti-absen').remove(filesToRemove);
             }
         }
-    
-        // 2. Hapus database
-        await _supabase.from('absensi_sapd')
-            .delete()
-            .gte('created_at', mon.toISOString())
-            .lte('created_at', sun.toISOString());
-    
+        await _supabase.from('absensi_sapd').delete().gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
         alert("Seluruh data dan gambar minggu ini telah dibersihkan!");
         loadData();
     }
