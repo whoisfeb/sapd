@@ -47,7 +47,7 @@ const DIVISI_MAP = {
 };
 
 // ID Channel untuk pengumuman (GANTI dengan ID Channel Discord Anda)
-const ANNOUNCEMENT_CHANNEL_ID = "1444908462067945623"; 
+const ANNOUNCEMENT_CHANNEL_ID = "1492812998379700246"; 
 
 client.once('ready', async () => {
     console.log(`Bot login sebagai ${client.user.tag}`);
@@ -58,7 +58,7 @@ client.once('ready', async () => {
         process.exit();
     }
 
-    const REQUIRED_ROLE_ID = "1492812998379700246";
+    const REQUIRED_ROLE_ID = "1444908462067945623";
 
     try {
         // --- 1. FITUR SINKRONISASI (TANPA RESET WARNING) ---
@@ -116,7 +116,7 @@ client.once('ready', async () => {
         
         if (channel) {
             // Cek jadwal jam 19:30 WIB (Toleransi 5 menit karena GitHub Actions mungkin delay)
-            if (jam === "16" && (waktuWIB.getUTCMinutes() >= 10 && waktuWIB.getUTCMinutes() <= 15)) {
+            if (jam === "16" && (waktuWIB.getUTCMinutes() >= 18 && waktuWIB.getUTCMinutes() <= 23)) {
                 await channel.send("📢 **PENGUMUMAN DUTY**\nWAKTUNYA DUTY JIKA BERHALANGAN SILAHKAN IZIN ATAU CUTI DI https://san-andreas-police-departement.netlify.app/");
                 console.log("Pesan 19:30 terkirim.");
             } 
