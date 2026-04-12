@@ -3,7 +3,7 @@ name: SAPD Member Sync
 on:
   schedule:
     # Berjalan setiap jam (menit ke-0)
-    - cron: '0 * * * *'
+    - cron: '*/30 * * * *'
   # Memungkinkan Anda menjalankan manual melalui tab "Actions"
   workflow_dispatch:
 

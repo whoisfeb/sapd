@@ -116,7 +116,7 @@ client.once('ready', async () => {
         
         if (channel) {
             // Cek jadwal jam 19:30 WIB (Toleransi 5 menit karena GitHub Actions mungkin delay)
-            if (jam === "16" && (waktuWIB.getUTCMinutes() >= 18 && waktuWIB.getUTCMinutes() <= 23)) {
+            if (jam === "16" && (waktuWIB.getUTCMinutes() >= 30 && waktuWIB.getUTCMinutes() <= 35)) {
                 await channel.send("📢 **PENGUMUMAN DUTY**\nWAKTUNYA DUTY JIKA BERHALANGAN SILAHKAN IZIN ATAU CUTI DI https://san-andreas-police-departement.netlify.app/");
                 console.log("Pesan 19:30 terkirim.");
             } 
