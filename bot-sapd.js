@@ -60,13 +60,14 @@ client.once('ready', async () => {
     }
 
     try {
-        // --- 1. FITUR SINKRONISASI (SAFE MODE: TIDAK RESET WARNING) ---
+        // --- 1. FITUR SINKRONISASI ---
         console.log("Memulai sinkronisasi member...");
         const members = await guild.members.fetch();
         const dataToUpsert = [];
         const activeDiscordIds = [];
 
-        members.forEach(member => {
+        // Gunakan for...of untuk mendukung await di dalam loop
+        for (const [id, member] of members) {
             if (member.roles.cache.has(REQUIRED_ROLE_ID)) {
                 let userPangkat = "-";
                 let userDivisi = "-";
@@ -76,20 +77,31 @@ client.once('ready', async () => {
                     if (DIVISI_MAP[role.id]) userDivisi = DIVISI_MAP[role.id];
                 });
 
+                const freshName = member.nickname || member.user.globalName || member.user.username;
                 activeDiscordIds.push(member.id);
+
+                // Sinkronisasi data ke tabel logs (absensi_sapd)
+                // Mengupdate semua baris yang sudah ada tanpa menambah data baru (mencegah duplikat)
+                await supabase
+                    .from('absensi_sapd')
+                    .update({
+                        nama_anggota: freshName,
+                        pangkat: userPangkat,
+                        divisi: userDivisi
+                    })
+                    .eq('discord_id', member.id);
+
                 dataToUpsert.push({
                     discord_id: member.id,
-                    nama_anggota: member.nickname || member.user.globalName || member.user.username,
+                    nama_anggota: freshName,
                     pangkat: userPangkat,
                     divisi: userDivisi,
                     last_login: new Date().toISOString()
-                    // total_warning TIDAK dimasukkan agar nilainya di DB tidak tertimpa
                 });
             }
-        });
+        }
 
-        // HAPUS HANYA yang sudah tidak punya Role Inti (Member yang keluar/pecat)
-        // Ini mencegah penghapusan massal yang meriset warning
+        // HAPUS member yang keluar (Fitur users_master tetap sesuai aslinya)
         if (activeDiscordIds.length > 0) {
             const { error: deleteError } = await supabase
                 .from('users_master')
@@ -99,13 +111,13 @@ client.once('ready', async () => {
             if (deleteError) console.error("Gagal menghapus member keluar:", deleteError.message);
         }
 
-        // UPDATE atau TAMBAH data baru
+        // UPDATE atau TAMBAH ke users_master
         const { error: upsertError } = await supabase
             .from('users_master')
             .upsert(dataToUpsert, { onConflict: 'discord_id' });
 
         if (upsertError) throw upsertError;
-        console.log("Sinkronisasi Berhasil! Database terupdate & Total Warning aman.");
+        console.log("Sinkronisasi Berhasil! Database profil & riwayat absen terupdate.");
 
         // --- 2. FITUR BROADCAST (WIB) ---
         const sekarang = new Date();
@@ -119,13 +131,10 @@ client.once('ready', async () => {
         const channel = await client.channels.fetch(ANNOUNCEMENT_CHANNEL_ID);
         
         if (channel) {
-            // Jam 19:30 WIB
-            // Jam 16:30 (Rentang diperlebar agar saat kamu klik "Run" tidak telat)
             if (jam === "19" && (menit >= 30 && menit <= 59)) { 
                 await channel.send("📢 **PENGUMUMAN DUTY**\nWAKTUNYA DUTY JIKA BERHALANGAN SILAHKAN IZIN ATAU CUTI DI https://san-andreas-police-departement.netlify.app/\n\n@everyone");
-                console.log("Pesan 16:30 terkirim.");
+                console.log("Pesan 19:30 terkirim.");
             } 
-            // Jam 22:00 WIB
             else if (jam === "22" && (menit >= 0 && menit <= 59)) {
                 await channel.send("📢 **REMINDER ABSENSI**\nJANGAN LUPA UNTUK MENGISI KEHADIRAN DI https://san-anndreas-police-departement.netlify.app/\n\n@everyone");
                 console.log("Pesan 22:00 terkirim.");
