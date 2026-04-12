@@ -53,7 +53,7 @@ async function loadData() {
                 ket: ketAsli,
                 alasan: log.alasan || "-", // Ambil dari row alasan
                 waktuDuty: log.jam_duty || "-", // Ambil dari jam_duty
-                bukti: log.bukti_foto || log.bukti_foto,
+                bukti: log.bukti_foto || log.bukti_gambar,
                 tanggalLog: new Date(log.created_at).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' }),
                 divisi: userWeekly[discordId].info.divisi || "-"
             };
@@ -313,15 +313,45 @@ async function resetUser(id) {
     if (!confirm("Hapus data absensi & bukti gambar anggota ini di minggu ini?")) return;
     const { mon, sun } = getWeekRange(currentWeekOffset);
     
-    const { data: logs } = await _supabase.from('absensi_sapd').select('bukti_foto').eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+    // 1. Ambil data log untuk mendapatkan URL gambar
+    const { data: logs } = await _supabase.from('absensi_sapd')
+        .select('bukti_foto') // Pastikan nama kolom sesuai (bukti_foto atau bukti_gambar)
+        .eq('discord_id', id)
+        .gte('created_at', mon.toISOString())
+        .lte('created_at', sun.toISOString());
+
     if (logs && logs.length > 0) {
-        const filesToRemove = logs.map(log => log.bukti_foto ? `absensi/${log.bukti_foto}` : null).filter(path => path !== null);
+        let filesToRemove = [];
+        
+        logs.forEach(log => {
+            if (log.bukti_foto && log.bukti_foto !== "N/A") {
+                // Pecah string jika ada banyak gambar (koma), lalu ambil nama filenya saja
+                const urls = log.bukti_foto.split(', ');
+                urls.forEach(url => {
+                    // Mengambil bagian setelah '/absensi/' untuk mendapatkan nama filenya
+                    const fileName = url.split('/absensi/')[1];
+                    if (fileName) filesToRemove.push(`absensi/${fileName}`);
+                });
+            }
+        });
+
+        // 2. Hapus dari Storage jika ada file
         if (filesToRemove.length > 0) {
-            await _supabase.storage.from('bukti-absen').remove(filesToRemove);
+            const { error: storageError } = await _supabase.storage
+                .from('bukti-absen')
+                .remove(filesToRemove);
+            
+            if(storageError) console.error("Gagal hapus gambar di storage:", storageError);
         }
     }
 
-    await _supabase.from('absensi_sapd').delete().eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+    // 3. Hapus data dari Database
+    await _supabase.from('absensi_sapd')
+        .delete()
+        .eq('discord_id', id)
+        .gte('created_at', mon.toISOString())
+        .lte('created_at', sun.toISOString());
+
     alert("Data dan Gambar berhasil dihapus!");
     loadData();
 }
@@ -329,14 +359,36 @@ async function resetUser(id) {
 async function resetAllWeeklyData() {
     if (!confirm("Hapus SEMUA data absensi & bukti gambar minggu ini?")) return;
     const { mon, sun } = getWeekRange(currentWeekOffset);
-    const { data: allLogs } = await _supabase.from('absensi_sapd').select('bukti_foto').gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+
+    // 1. Ambil semua log minggu ini
+    const { data: allLogs } = await _supabase.from('absensi_sapd')
+        .select('bukti_foto')
+        .gte('created_at', mon.toISOString())
+        .lte('created_at', sun.toISOString());
+
     if (allLogs && allLogs.length > 0) {
-        const filesToRemove = allLogs.map(log => log.bukti_foto ? `absensi/${log.bukti_fotor}` : null).filter(path => path !== null);
+        let filesToRemove = [];
+        allLogs.forEach(log => {
+            if (log.bukti_foto && log.bukti_foto !== "N/A") {
+                const urls = log.bukti_foto.split(', ');
+                urls.forEach(url => {
+                    const fileName = url.split('/absensi/')[1];
+                    if (fileName) filesToRemove.push(`absensi/${fileName}`);
+                });
+            }
+        });
+
         if (filesToRemove.length > 0) {
             await _supabase.storage.from('bukti-absen').remove(filesToRemove);
         }
     }
-    await _supabase.from('absensi_sapd').delete().gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
+
+    // 2. Hapus dari Database
+    await _supabase.from('absensi_sapd')
+        .delete()
+        .gte('created_at', mon.toISOString())
+        .lte('created_at', sun.toISOString());
+
     alert("Seluruh data minggu ini telah dibersihkan!");
     loadData();
 }
