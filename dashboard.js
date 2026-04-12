@@ -1,5 +1,5 @@
 /**
- * DASHBOARD.JS - VERSI MULTI-UPLOAD STABIL
+ * DASHBOARD.JS - VERSI SINKRONISASI OTOMATIS
  */
 
 const _supabase = window.supabase.createClient(
@@ -7,7 +7,6 @@ const _supabase = window.supabase.createClient(
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4"
 );
 
-// VARIABEL GLOBAL UNTUK MULTI-UPLOAD
 let selectedFiles = [];
 
 window.onload = async () => {
@@ -18,6 +17,7 @@ window.onload = async () => {
     const divisi = urlParams.get('divisi');
     const isAdmin = urlParams.get('admin') === 'true';
 
+    // Simpan data dari URL jika ada (saat login pertama)
     if (discordId && name) {
         localStorage.setItem("discord_id", discordId);
         localStorage.setItem("nama_user", decodeURIComponent(name));
@@ -40,117 +40,39 @@ window.onload = async () => {
         return;
     }
 
-    updateUI();
+    // Jalankan update tampilan (sekarang memanggil database)
+    await updateUI();
     toggleFormMode();
     updateGajiDisplay(); 
 };
 
-// --- FITUR PREVIEW & HAPUS GAMBAR ---
-document.getElementById('bukti_foto').addEventListener('change', function(e) {
-    const files = Array.from(e.target.files);
-    files.forEach(file => {
-        // Cek agar tidak memasukkan file yang sama persis
-        if (!selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
-            selectedFiles.push(file);
+// --- LOGIKA DASHBOARD DATA (SINKRON KE DATABASE) ---
+async function updateUI() {
+    const discId = localStorage.getItem("discord_id");
+
+    try {
+        // AMBIL DATA TERBARU DARI DATABASE users_master
+        const { data: user, error } = await _supabase
+            .from('users_master')
+            .select('nama_anggota, pangkat, divisi')
+            .eq('discord_id', discId)
+            .single();
+
+        if (user && !error) {
+            // Update LocalStorage agar sinkron dengan Database
+            localStorage.setItem("nama_user", user.nama_anggota);
+            localStorage.setItem("pangkat", user.pangkat);
+            localStorage.setItem("divisi", user.divisi);
         }
-    });
-    renderPreview();
-    this.value = ""; // Reset agar bisa pilih file yang sama setelah dihapus
-});
+    } catch (e) { console.warn("Gagal sinkron database, menggunakan cache local."); }
 
-function renderPreview() {
-    const gallery = document.getElementById('preview-gallery');
-    gallery.innerHTML = "";
-    
-    selectedFiles.forEach((file, index) => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const div = document.createElement('div');
-            div.style.cssText = "position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; border: 2px solid #30475e;";
-            div.innerHTML = `
-                <img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;">
-                <button type="button" onclick="removeImage(${index})" style="position: absolute; top: 2px; right: 2px; background: #e94560; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px; font-weight: bold; display: flex; align-items: center; justify-content: center;">✕</button>
-            `;
-            gallery.appendChild(div);
-        }
-        reader.readAsDataURL(file);
-    });
-}
-
-function removeImage(index) {
-    selectedFiles.splice(index, 1);
-    renderPreview();
-}
-
-// --- LOGIKA DASHBOARD DATA ---
-function updateUI() {
+    // Tampilkan ke layar
     document.getElementById('name-display').innerText = localStorage.getItem("nama_user");
     document.getElementById('rank-display').innerText = `${localStorage.getItem("pangkat")} | ${localStorage.getItem("divisi")}`;
+    
     if (localStorage.getItem("is_admin") === "true") {
         const adminLink = document.getElementById('admin-link');
         if(adminLink) adminLink.style.display = 'block';
-    }
-}
-
-async function updateGajiDisplay() {
-    const discId = localStorage.getItem("discord_id");
-    const pangkat = localStorage.getItem("pangkat");
-    
-    const d = new Date();
-    const day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6 : 1);
-    const monday = new Date(d.setDate(diff));
-    monday.setHours(0, 0, 0, 0);
-
-    try {
-        const { data: logs } = await _supabase
-            .from('absensi_sapd')
-            .select('jam_duty, created_at')
-            .eq('discord_id', discId)
-            .gte('created_at', monday.toISOString());
-        
-        const hariHadirUnik = new Set();
-        const hariIzinUnik = new Set();
-        const hariCutiUnik = new Set();
-
-        if (logs) {
-            logs.forEach(l => {
-                const tanggalHanya = new Date(l.created_at).toISOString().split('T')[0];
-                const ket = (l.jam_duty || "").toUpperCase();
-                if (ket.includes("IZIN")) hariIzinUnik.add(tanggalHanya);
-                else if (ket.includes("CUTI")) hariCutiUnik.add(tanggalHanya);
-                else hariHadirUnik.add(tanggalHanya);
-            });
-        }
-
-        const h = hariHadirUnik.size;
-        const totalInput = h + hariIzinUnik.size + hariCutiUnik.size;
-        
-        const hasil = hitungGajiMember(pangkat, h);
-        
-        document.getElementById('gaji-val').innerText = `$${hasil.gajiAkhir.toLocaleString()}`;
-        document.getElementById('stat-hadir').innerText = h;
-        document.getElementById('stat-izin').innerText = hariIzinUnik.size;
-        document.getElementById('stat-cuti').innerText = hariCutiUnik.size;
-        document.getElementById('stat-alpa').innerText = Math.max(0, 6 - totalInput);
-    } catch (err) { console.error(err); }
-}
-
-function toggleFormMode() {
-    const status = document.getElementById('status_absen').value;
-    const today = new Date().toLocaleDateString('en-CA'); 
-    const hadirSec = document.getElementById('hadir-section');
-    const singleSec = document.getElementById('single-date-section');
-    const rangeSec = document.getElementById('range-date-section');
-    const tglInput = document.getElementById('tanggal_absen');
-
-    if (status === "HADIR") {
-        singleSec.style.display = "block"; rangeSec.style.display = "none"; hadirSec.style.display = "block";
-        tglInput.max = today;
-    } else if (status === "IZIN") {
-        singleSec.style.display = "block"; rangeSec.style.display = "none"; hadirSec.style.display = "none";
-        tglInput.min = today;
-    } else if (status === "CUTI") {
-        singleSec.style.display = "none"; rangeSec.style.display = "block"; hadirSec.style.display = "none";
     }
 }
 
@@ -211,15 +133,31 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
             body: JSON.stringify(reports)
         });
 
+        const result = await response.json();
+
+        if (response.status === 403) {
+            alert("Akses Ditolak! Anda bukan lagi bagian dari SAPD.");
+            localStorage.clear();
+            window.location.href = "index.html";
+            return;
+        }
+
         if (response.status !== 200) throw new Error("Gagal mengirim.");
 
-        msg.innerText = "✔ Berhasil dikirim!";
+        // JIKA BERHASIL, UPDATE LOCALSTORAGE DENGAN DATA TERBARU DARI SERVER
+        if (result.updatedData) {
+            localStorage.setItem("nama_user", result.updatedData.name);
+            localStorage.setItem("pangkat", result.updatedData.pangkat);
+            localStorage.setItem("divisi", result.updatedData.divisi);
+        }
+
+        msg.innerText = "✔ Berhasil dikirim & Data Diperbarui!";
         msg.style.color = "#2ecc71";
         
-        // Reset State
         document.getElementById('absensi-form').reset();
         selectedFiles = [];
         renderPreview();
+        await updateUI(); // Update tampilan layar
         updateGajiDisplay();
 
     } catch (err) {
@@ -230,6 +168,90 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
         btn.innerText = "Kirim Laporan";
     }
 });
+
+// --- SISA FUNGSI LAINNYA (Preview, Gaji, dll tetap sama) ---
+function renderPreview() {
+    const gallery = document.getElementById('preview-gallery');
+    gallery.innerHTML = "";
+    selectedFiles.forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const div = document.createElement('div');
+            div.style.cssText = "position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; border: 2px solid #30475e;";
+            div.innerHTML = `<img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;">
+                             <button type="button" onclick="removeImage(${index})" style="position: absolute; top: 2px; right: 2px; background: #e94560; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px; font-weight: bold; display: flex; align-items: center; justify-content: center;">✕</button>`;
+            gallery.appendChild(div);
+        }
+        reader.readAsDataURL(file);
+    });
+}
+
+function removeImage(index) {
+    selectedFiles.splice(index, 1);
+    renderPreview();
+}
+
+document.getElementById('bukti_foto').addEventListener('change', function(e) {
+    const files = Array.from(e.target.files);
+    files.forEach(file => {
+        if (!selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
+            selectedFiles.push(file);
+        }
+    });
+    renderPreview();
+    this.value = "";
+});
+
+async function updateGajiDisplay() {
+    const discId = localStorage.getItem("discord_id");
+    const pangkat = localStorage.getItem("pangkat");
+    const d = new Date();
+    const day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6 : 1);
+    const monday = new Date(d.setDate(diff));
+    monday.setHours(0, 0, 0, 0);
+
+    try {
+        const { data: logs } = await _supabase.from('absensi_sapd').select('jam_duty, created_at').eq('discord_id', discId).gte('created_at', monday.toISOString());
+        const hariHadirUnik = new Set();
+        const hariIzinUnik = new Set();
+        const hariCutiUnik = new Set();
+        if (logs) {
+            logs.forEach(l => {
+                const tanggalHanya = new Date(l.created_at).toISOString().split('T')[0];
+                const ket = (l.jam_duty || "").toUpperCase();
+                if (ket.includes("IZIN")) hariIzinUnik.add(tanggalHanya);
+                else if (ket.includes("CUTI")) hariCutiUnik.add(tanggalHanya);
+                else hariHadirUnik.add(tanggalHanya);
+            });
+        }
+        const h = hariHadirUnik.size;
+        const totalInput = h + hariIzinUnik.size + hariCutiUnik.size;
+        const hasil = hitungGajiMember(pangkat, h);
+        document.getElementById('gaji-val').innerText = `$${hasil.gajiAkhir.toLocaleString()}`;
+        document.getElementById('stat-hadir').innerText = h;
+        document.getElementById('stat-izin').innerText = hariIzinUnik.size;
+        document.getElementById('stat-cuti').innerText = hariCutiUnik.size;
+        document.getElementById('stat-alpa').innerText = Math.max(0, 6 - totalInput);
+    } catch (err) { console.error(err); }
+}
+
+function toggleFormMode() {
+    const status = document.getElementById('status_absen').value;
+    const today = new Date().toLocaleDateString('en-CA'); 
+    const hadirSec = document.getElementById('hadir-section');
+    const singleSec = document.getElementById('single-date-section');
+    const rangeSec = document.getElementById('range-date-section');
+    const tglInput = document.getElementById('tanggal_absen');
+    if (status === "HADIR") {
+        singleSec.style.display = "block"; rangeSec.style.display = "none"; hadirSec.style.display = "block";
+        tglInput.max = today;
+    } else if (status === "IZIN") {
+        singleSec.style.display = "block"; rangeSec.style.display = "none"; hadirSec.style.display = "none";
+        tglInput.min = today;
+    } else if (status === "CUTI") {
+        singleSec.style.display = "none"; rangeSec.style.display = "block"; hadirSec.style.display = "none";
+    }
+}
 
 function logout() { 
     if (confirm("Logout?")) { localStorage.clear(); window.location.href = "index.html"; }
