@@ -120,10 +120,11 @@ client.once('ready', async () => {
         
         if (channel) {
             // Jam 19:30 WIB
-            if (jam === "19" && (menit >= 30 && menit <= 35)) {
-                await channel.send("📢 **PENGUMUMAN DUTY**\nWAKTUNYA DUTY JIKA BERHALANGAN SILAHKAN IZIN ATAU CUTI DI https://san-andreas-police-departement.netlify.app/");
-                console.log("Pesan 19:30 terkirim.");
-            } 
+            // Jam 16:30 (Rentang diperlebar agar saat kamu klik "Run" tidak telat)
+if (jam === "16" && (menit >= 30 && menit <= 59)) { 
+    await channel.send("📢 **TEST PENGUMUMAN**...");
+    console.log("Pesan 16:30 terkirim.");
+} 
             // Jam 22:00 WIB
             else if (jam === "22" && (menit >= 0 && menit <= 5)) {
                 await channel.send("📢 **REMINDER ABSENSI**\nJANGAN LUPA UNTUK MENGISI KEHADIRAN DI https://san-anndreas-police-departement.netlify.app/");
