@@ -24,7 +24,7 @@ jobs:
         run: npm install
 
       - name: Run Sync Script
-        run: node nama_file_bot_kamu.js # GANTI dengan nama file .js Anda
+        run: node bot-sapd.js # GANTI dengan nama file .js Anda
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
