@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, TextChannel } = require('discord.js');
+const { Client, GatewayIntentBits } = require('discord.js');
 const { createClient } = require('@supabase/supabase-js');
 
 // Inisialisasi Supabase
@@ -46,8 +46,9 @@ const DIVISI_MAP = {
     "1444921352120434819": "INTERNAL AFFAIRS DIVISION"
 };
 
-// ID Channel untuk pengumuman (GANTI dengan ID Channel Discord Anda)
+// ID Channel untuk pengumuman
 const ANNOUNCEMENT_CHANNEL_ID = "1492812998379700246"; 
+const REQUIRED_ROLE_ID = "1444908462067945623";
 
 client.once('ready', async () => {
     console.log(`Bot login sebagai ${client.user.tag}`);
@@ -58,10 +59,8 @@ client.once('ready', async () => {
         process.exit();
     }
 
-    const REQUIRED_ROLE_ID = "1444908462067945623";
-
     try {
-        // --- 1. FITUR SINKRONISASI (TANPA RESET WARNING) ---
+        // --- 1. FITUR SINKRONISASI (SAFE MODE: TIDAK RESET WARNING) ---
         console.log("Memulai sinkronisasi member...");
         const members = await guild.members.fetch();
         const dataToUpsert = [];
@@ -84,44 +83,49 @@ client.once('ready', async () => {
                     pangkat: userPangkat,
                     divisi: userDivisi,
                     last_login: new Date().toISOString()
+                    // total_warning TIDAK dimasukkan agar nilainya di DB tidak tertimpa
                 });
             }
         });
 
-        // Hapus hanya member yang sudah tidak punya Role Inti di Discord
-        await supabase
-            .from('users_master')
-            .delete()
-            .not('discord_id', 'in', `(${activeDiscordIds.join(',')})`);
+        // HAPUS HANYA yang sudah tidak punya Role Inti (Member yang keluar/pecat)
+        // Ini mencegah penghapusan massal yang meriset warning
+        if (activeDiscordIds.length > 0) {
+            const { error: deleteError } = await supabase
+                .from('users_master')
+                .delete()
+                .not('discord_id', 'in', `(${activeDiscordIds.join(',')})`);
+            
+            if (deleteError) console.error("Gagal menghapus member keluar:", deleteError.message);
+        }
 
-        // Update/Tambah data (Tanpa menyentuh kolom total_warning)
+        // UPDATE atau TAMBAH data baru
         const { error: upsertError } = await supabase
             .from('users_master')
             .upsert(dataToUpsert, { onConflict: 'discord_id' });
 
         if (upsertError) throw upsertError;
-        console.log("Sinkronisasi Berhasil! Data Warning Aman.");
+        console.log("Sinkronisasi Berhasil! Database terupdate & Total Warning aman.");
 
-        // --- 2. FITUR BROADCAST (BERDASARKAN WAKTU WIB) ---
+        // --- 2. FITUR BROADCAST (WIB) ---
         const sekarang = new Date();
-        // Konversi ke WIB (UTC+7)
         const waktuWIB = new Date(sekarang.getTime() + (7 * 60 * 60 * 1000));
         const jam = waktuWIB.getUTCHours().toString().padStart(2, '0');
-        const menit = waktuWIB.getUTCMinutes().toString().padStart(2, '0');
-        const waktuString = `${jam}:${menit}`;
+        const menit = waktuWIB.getUTCMinutes();
+        const waktuString = `${jam}:${menit.toString().padStart(2, '0')}`;
 
         console.log(`Waktu saat ini (WIB): ${waktuString}`);
 
         const channel = await client.channels.fetch(ANNOUNCEMENT_CHANNEL_ID);
         
         if (channel) {
-            // Cek jadwal jam 19:30 WIB (Toleransi 5 menit karena GitHub Actions mungkin delay)
-            if (jam === "16" && (waktuWIB.getUTCMinutes() >= 30 && waktuWIB.getUTCMinutes() <= 35)) {
+            // Jam 19:30 WIB
+            if (jam === "19" && (menit >= 30 && menit <= 35)) {
                 await channel.send("📢 **PENGUMUMAN DUTY**\nWAKTUNYA DUTY JIKA BERHALANGAN SILAHKAN IZIN ATAU CUTI DI https://san-andreas-police-departement.netlify.app/");
                 console.log("Pesan 19:30 terkirim.");
             } 
-            // Cek jadwal jam 22:00 WIB
-            else if (jam === "22" && (waktuWIB.getUTCMinutes() >= 0 && waktuWIB.getUTCMinutes() <= 5)) {
+            // Jam 22:00 WIB
+            else if (jam === "22" && (menit >= 0 && menit <= 5)) {
                 await channel.send("📢 **REMINDER ABSENSI**\nJANGAN LUPA UNTUK MENGISI KEHADIRAN DI https://san-anndreas-police-departement.netlify.app/");
                 console.log("Pesan 22:00 terkirim.");
             }
@@ -130,7 +134,6 @@ client.once('ready', async () => {
     } catch (err) {
         console.error("Terjadi kesalahan:", err.message);
     } finally {
-        // Beri jeda sebentar agar pesan terkirim sebelum bot mati
         setTimeout(() => process.exit(), 5000);
     }
 });
