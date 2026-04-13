@@ -311,7 +311,7 @@ const kodeHTML = `
         <section id="bab16">
             <h2 class="bab-title">BAB 16: Prosedur Interogasi</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 16</span>
+                <span class="pasal-label">Pasal 18</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Melakukan tindakan kekerasan berlebihan yang menyebabkan cacat pada terperiksa.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -325,7 +325,7 @@ const kodeHTML = `
         <section id="bab17">
             <h2 class="bab-title">BAB 17: Barang Bukti</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 17</span>
+                <span class="pasal-label">Pasal 19</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Sengaja menghilangkan, merusak, atau menukar barang bukti asli.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -339,7 +339,7 @@ const kodeHTML = `
         <section id="bab18">
             <h2 class="bab-title">BAB 18: Olah TKP</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 18</span>
+                <span class="pasal-label">Pasal 20</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Membiarkan TKP terkontaminasi atau sengaja merusak garis polisi.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -353,7 +353,7 @@ const kodeHTML = `
         <section id="bab19">
             <h2 class="bab-title">BAB 19: Penyadapan Radio</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 19</span>
+                <span class="pasal-label">Pasal 21</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Menggunakan alat penyadap instansi untuk memantau privasi personil lain tanpa izin.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -367,7 +367,7 @@ const kodeHTML = `
         <section id="bab20">
             <h2 class="bab-title">BAB 20: Dana Informan</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 20</span>
+                <span class="pasal-label">Pasal 22</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Korupsi atau laporan fiktif terkait biaya operasional informan lapangan.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -381,7 +381,7 @@ const kodeHTML = `
         <section id="bab21">
             <h2 class="bab-title">BAB 21: Penanganan Massa</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 21</span>
+                <span class="pasal-label">Pasal 23</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Melakukan tindakan represif tanpa perintah Komandan Satuan (Dansat).</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -395,7 +395,7 @@ const kodeHTML = `
         <section id="bab22">
             <h2 class="bab-title">BAB 22: Gas Air Mata</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 22</span>
+                <span class="pasal-label">Pasal 24</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Menembakkan gas air mata ke area pemukiman padat tanpa urgensi tinggi.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -409,7 +409,7 @@ const kodeHTML = `
         <section id="bab23">
             <h2 class="bab-title">BAB 23: Tilang Manual</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 23</span>
+                <span class="pasal-label">Pasal 25</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Menarik denda tunai di tempat tanpa memberikan slip resmi bank.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -423,7 +423,7 @@ const kodeHTML = `
         <section id="bab24">
             <h2 class="bab-title">BAB 24: Reserse Kriminal</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 24</span>
+                <span class="pasal-label">Pasal 26</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Sengaja merekayasa alat bukti demi menaikkan status tersangka (Kriminalisasi).</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -437,7 +437,7 @@ const kodeHTML = `
         <section id="bab25">
             <h2 class="bab-title">BAB 25: Reserse Narkotika</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 25</span>
+                <span class="pasal-label">Pasal 27</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Positif mengonsumsi narkotika hasil sitaan atau distribusi ilegal.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -451,7 +451,7 @@ const kodeHTML = `
         <section id="bab26">
             <h2 class="bab-title">BAB 26: Reserse Cyber</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 26</span>
+                <span class="pasal-label">Pasal 28</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Menggunakan otoritas akses database negara untuk kepentingan pemerasan.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -465,7 +465,7 @@ const kodeHTML = `
         <section id="bab27">
             <h2 class="bab-title">BAB 27: Persenjataan</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 27</span>
+                <span class="pasal-label">Pasal 29</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Membawa senjata api ke tempat hiburan malam atau lokasi yang dilarang protokol.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -479,7 +479,7 @@ const kodeHTML = `
         <section id="bab28">
             <h2 class="bab-title">BAB 28: Perawatan Senpi</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 28</span>
+                <span class="pasal-label">Pasal 30</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Sengaja tidak membersihkan senjata hingga terjadi kerusakan fungsi teknis.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -493,7 +493,7 @@ const kodeHTML = `
         <section id="bab29">
             <h2 class="bab-title">BAB 29: Divisi Propam</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 29</span>
+                <span class="pasal-label">Pasal 31</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Menolak diperiksa oleh anggota Propam dalam rangka investigasi internal.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -507,7 +507,7 @@ const kodeHTML = `
         <section id="bab30">
             <h2 class="bab-title">BAB 30: Provos Disiplin</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 30</span>
+                <span class="pasal-label">Pasal 32</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Melakukan perlawanan fisik saat akan ditertibkan oleh Provos.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -521,7 +521,7 @@ const kodeHTML = `
         <section id="bab31">
             <h2 class="bab-title">BAB 31: Tes Urin</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 31</span>
+                <span class="pasal-label">Pasal 33</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Sengaja menukar sampel urin atau memanipulasi hasil tes laboratorium.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -535,7 +535,7 @@ const kodeHTML = `
         <section id="bab32">
             <h2 class="bab-title">BAB 32: Kekayaan Personil</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 32</span>
+                <span class="pasal-label">Pasal 34</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Tidak mampu menjelaskan asal-usul harta kekayaan yang melebihi pendapatan logis (Money Laundering).</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -549,7 +549,7 @@ const kodeHTML = `
         <section id="bab33">
             <h2 class="bab-title">BAB 33: Kode Etik Profesi</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 33</span>
+                <span class="pasal-label">Pasal 35</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Mencemarkan kehormatan kepolisian Polku melalui perilaku menyimpang di publik.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -563,7 +563,7 @@ const kodeHTML = `
         <section id="bab34">
             <h2 class="bab-title">BAB 34: Sidang Internal</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 34</span>
+                <span class="pasal-label">Pasal 36</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Memberikan keterangan palsu di bawah sumpah saat sidang komisi kode etik.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -577,7 +577,7 @@ const kodeHTML = `
         <section id="bab35">
             <h2 class="bab-title">BAB 35: Skorsing</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 35</span>
+                <span class="pasal-label">Pasal 37</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Masuk ke area dinas tanpa izin tertulis selama masa skorsing aktif.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -591,7 +591,7 @@ const kodeHTML = `
         <section id="bab36">
             <h2 class="bab-title">BAB 36: Patsus Sel</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 36</span>
+                <span class="pasal-label">Pasal 38</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Melarikan diri atau mencoba merusak fasilitas sel penempatan khusus.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -605,7 +605,7 @@ const kodeHTML = `
         <section id="bab37">
             <h2 class="bab-title">BAB 37: PTDH Pecat</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 37</span>
+                <span class="pasal-label">Pasal 39</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Personil yang di-PTDH wajib mengembalikan seluruh inventaris negara dalam 1x24 jam.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -618,7 +618,7 @@ const kodeHTML = `
         <section id="bab38">
             <h2 class="bab-title">BAB 38: Blacklist NRP</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 38</span>
+                <span class="pasal-label">Pasal 40</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Mencoba mendaftar kembali atau masuk ke lingkungan militer/polisi dengan NRP palsu.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
@@ -631,7 +631,7 @@ const kodeHTML = `
         <section id="bab39">
             <h2 class="bab-title">BAB 39: Denda Administratif</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 39</span>
+                <span class="pasal-label">Pasal 41</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Kelalaian membayar denda administratif yang telah dijatuhkan secara inkrah.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
