@@ -529,7 +529,7 @@ const kodeHTML = `
             <h2 class="bab-title">BAB 31: Kode Etik Profesi</h2>
             <div class="pasal">
                 <span class="pasal-label">Pasal 35</span>
-                <div class="ayat"><div class="ayat-n">1.</div><div>Mencemarkan kehormatan kepolisian Polku melalui perilaku menyimpang di publik.</div></div>
+                <div class="ayat"><div class="ayat-n">1.</div><div>Mencemarkan kehormatan kepolisian melalui perilaku menyimpang di publik.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
                     MIN: Denda Rp 25.000 | Penjara 20 Bulan<br>
@@ -626,7 +626,7 @@ const kodeHTML = `
         </section>
 
         <div style="margin-top: 100px; text-align: right; border-top: 1px solid #000; padding-top: 20px;">
-            <p>Ditetapkan di: Mabes Polku</p>
+            <p>Ditetapkan di: San Andreas Police Departement</p>
             <p style="margin-bottom: 50px;">Pada Tanggal: 07 April 2026</p>
             <strong>JENDERAL POLISI</strong>
         </div>
@@ -665,17 +665,15 @@ const menuHTML = `
     <a href="#bab26">BAB 26: Reserse Cyber (Penyalahgunaan Akses)</a>
     <a href="#bab27">BAB 27: Persenjataan (Kelalaian Inventaris)</a>
     <a href="#bab28">BAB 28: Perawatan Senpi (Kelalaian Teknis)</a>
-    <a href="#bab29">BAB 29: Divisi Propam (Pengawasan Internal)</a>
-    <a href="#bab30">BAB 30: Provos Disiplin (Tindakan Fisik)</a>
-    <a href="#bab31">BAB 31: Tes Urin (Positif Narkoba)</a>
-    <a href="#bab32">BAB 32: Kekayaan Personil (Laporan Palsu/TPPU)</a>
-    <a href="#bab33">BAB 33: Kode Etik Profesi (Pelanggaran Umum)</a>
-    <a href="#bab34">BAB 34: Sidang Internal (Mekanisme Vonis)</a>
-    <a href="#bab35">BAB 35: Skorsing (Pemberhentian Sementara)</a>
-    <a href="#bab36">BAB 36: Patsus Sel (Penahanan Internal)</a>
-    <a href="#bab37">BAB 37: PTDH Pecat (Sanksi Tertinggi)</a>
-    <a href="#bab38">BAB 38: Blacklist NRP (Pemutusan Akses)</a>
-    <a href="#bab39">BAB 39: Denda Administratif (Sanksi Finansial)</a>
+    <a href="#bab29">BAB 29: Internal Affairs Division (Pengawasan Internal)</a>
+    <a href="#bab30">BAB 30: Kekayaan Personil (Laporan Palsu/TPPU)</a>
+    <a href="#bab31">BAB 32: Kode Etik Profesi (Pelanggaran Umum)</a>
+    <a href="#bab32">BAB 32: Sidang Internal (Mekanisme Vonis)</a>
+    <a href="#bab33">BAB 33: Skorsing (Pemberhentian Sementara)</a>
+    <a href="#bab34">BAB 34: Patsus Sel (Penahanan Internal)</a>
+    <a href="#bab35">BAB 35: PTDH Pecat (Sanksi Tertinggi)</a>
+    <a href="#bab36">BAB 36: Blacklist NRP (Pemutusan Akses)</a>
+    <a href="#bab37">BAB 37: Denda Administratif (Sanksi Finansial)</a>
 `;
 
 // Masukkan ke dalam elemen HTML
