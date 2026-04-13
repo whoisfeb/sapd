@@ -552,8 +552,8 @@ const kodeHTML = `
                 <div class="ayat"><div class="ayat-n">2.</div><div>Tidak menghadiri persidangan internal dengan alasan apapun .</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 2:</span>
-                    MIN: Denda Rp Maksimal | Maksimal<br>
-                    MAX: Denda Rp Maksimal | Maksimal
+                    MIN: Denda Rp Maksimal | Hukuman Maksimal sesuai pasal yang di langgar<br>
+                    MAX: Denda Rp Maksimal | Hukuman Maksimal sesuai pasal yang di langgar
                 </div>
             </div>
         </section>
@@ -594,7 +594,7 @@ const kodeHTML = `
                 <div class="ayat"><div class="ayat-n">1.</div><div>Personil yang di-PTDH wajib mengembalikan seluruh inventaris negara dalam 1x24 jam.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    SANKSI: Penjara 60 Bulan (Jika inventaris digelapkan/tidak kembali).
+                    MIN: Denda Rp 15.000 | Penjara 60 Bulan (Jika inventaris digelapkan/tidak kembali).
                 </div>
             </div>
         </section>
@@ -620,7 +620,7 @@ const kodeHTML = `
                 <div class="ayat"><div class="ayat-n">1.</div><div>Kelalaian membayar denda administratif yang telah dijatuhkan secara inkrah.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    SANKSI: - | Penyitaan aset pribadi senilai denda + bunga 10%.
+                    MIN: Denda Rp - | Penyitaan aset pribadi senilai denda + bunga 10%.
                 </div>
             </div>
         </section>
