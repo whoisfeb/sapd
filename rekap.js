@@ -284,40 +284,40 @@ function bukaModalPelanggaranUU() {
     
     const parser = new DOMParser();
     const doc = parser.parseFromString(kodeHTML, 'text/html');
-    
-    // Kita looping setiap BAB (section)
     const sections = doc.querySelectorAll('section');
 
     sections.forEach(sec => {
         const babTitle = sec.querySelector('.bab-title')?.innerText || "Tanpa BAB";
-        
-        // Cari semua penalty-box di dalam section ini
-        // Ini akan menangani semua Ayat di dalam semua Pasal di BAB tersebut
         const penaltyBoxes = sec.querySelectorAll('.penalty-box');
 
         penaltyBoxes.forEach((box, index) => {
-            // Ambil label sanksi (Contoh: SANKSI AYAT 1)
             const sanksiLabel = box.querySelector('.denda-text')?.innerText || "SANKSI:";
-            
-            // Ambil teks Ayat yang ada tepat SEBELUM penalty-box ini
             const ayatElement = box.previousElementSibling;
-            const ayatText = ayatElement && ayatElement.classList.contains('ayat') ? ayatElement.innerText : "Pelanggaran terkait";
+            const ayatText = ayatElement && ayatElement.classList.contains('ayat') ? ayatElement.innerText.trim() : "Pelanggaran terkait";
 
-            // Ambil judul Pasal terdekat di atasnya
-            // Menggunakan querySelectorAll dan mencari yang paling dekat posisinya
             const allLabels = Array.from(sec.querySelectorAll('.pasal-label'));
             const currentPasalLabel = allLabels.reverse().find(l => l.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING)?.innerText || "";
 
-            const fullText = box.innerText;
-            const lines = fullText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            // PERBAIKAN: Gunakan innerHTML lalu ganti <br> menjadi newline agar split lebih akurat
+            const cleanText = box.innerHTML
+                .replace(/<br\s*[\/]?>/gi, "\n") // Ubah <br> jadi baris baru
+                .replace(/<[^>]+>/g, ""); // Hapus tag HTML lainnya (seperti span)
             
-            const lineMin = lines.find(l => l.includes("MIN:")) || "";
-            const lineMax = lines.find(l => l.includes("MAX:")) || "";
+            const lines = cleanText.split('\n').map(l => l.trim()).filter(l => l.length > 5);
+            
+            const lineMin = lines.find(l => l.toUpperCase().includes("MIN:")) || "";
+            const lineMax = lines.find(l => l.toUpperCase().includes("MAX:")) || "";
 
-            const dMin = (lineMin.match(/[\d.]+/g) || ["0"])[0].replace(/\./g, '');
-            const dMax = (lineMax.match(/[\d.]+/g) || ["0"])[0].replace(/\./g, '');
-            const hMin = lineMin.split('|')[1]?.trim() || "Teguran";
-            const hMax = lineMax.split('|')[1]?.trim() || "Sanksi Berat";
+            // Fungsi helper untuk ambil angka dan sanksi setelah |
+            const extractData = (text) => {
+                const dendaMatch = text.match(/[\d.]+/);
+                const dendaVal = dendaMatch ? dendaMatch[0].replace(/\./g, '') : "0";
+                const sanksiVal = text.split('|')[1]?.trim() || "-"; // Mengambil teks setelah |
+                return { denda: dendaVal, sanksi: sanksiVal };
+            };
+
+            const dataMin = extractData(lineMin);
+            const dataMax = extractData(lineMax);
 
             const uniqueId = `choice_${sec.id}_${index}`;
 
@@ -326,25 +326,27 @@ function bukaModalPelanggaranUU() {
             div.innerHTML = `
                 <div style="font-size: 10px; color: #888; text-transform: uppercase;">${babTitle} | ${currentPasalLabel}</div>
                 <div style="color:#00adb5; font-weight:bold; font-size:13px; margin: 5px 0;">${sanksiLabel}</div>
-                <div style="font-size:11px; color:#bbb; margin-bottom:12px; line-height:1.4;">"${ayatText}"</div>
+                <div style="font-size:11px; color:#bbb; margin-bottom:12px; line-height:1.4;">${ayatText}</div>
                 
                 <div style="display:flex; gap:10px;">
                     <label style="flex:1; cursor:pointer; background:#1a1a2e; padding:10px; border-radius:6px; border:1px solid #30475e; text-align:center;">
                         <input type="radio" name="${uniqueId}" class="cb-uu" 
-                            data-denda="${dMin}" data-hukuman="${hMin}"
+                            data-denda="${dataMin.denda}" 
+                            data-hukuman="${dataMin.sanksi}"
                             data-label="${currentPasalLabel} - ${sanksiLabel} (MIN)" onchange="hitungUU()">
                         <div style="font-weight:bold; color:#fff; font-size:10px;">MIN</div>
-                        <div style="color:#27ae60; font-size:12px; font-weight:bold;">Rp ${parseInt(dMin).toLocaleString()}</div>
-                        <div style="color:#e94560; font-size:9px;">${hMin}</div>
+                        <div style="color:#27ae60; font-size:12px; font-weight:bold;">Rp ${parseInt(dataMin.denda).toLocaleString('id-ID')}</div>
+                        <div style="color:#e94560; font-size:10px; font-weight:bold;">${dataMin.sanksi}</div>
                     </label>
 
                     <label style="flex:1; cursor:pointer; background:#1a1a2e; padding:10px; border-radius:6px; border:1px solid #30475e; text-align:center;">
                         <input type="radio" name="${uniqueId}" class="cb-uu" 
-                            data-denda="${dMax}" data-hukuman="${hMax}"
+                            data-denda="${dataMax.denda}" 
+                            data-hukuman="${dataMax.sanksi}"
                             data-label="${currentPasalLabel} - ${sanksiLabel} (MAX)" onchange="hitungUU()">
                         <div style="font-weight:bold; color:#fff; font-size:10px;">MAX</div>
-                        <div style="color:#27ae60; font-size:12px; font-weight:bold;">Rp ${parseInt(dMax).toLocaleString()}</div>
-                        <div style="color:#e94560; font-size:9px;">${hMax}</div>
+                        <div style="color:#27ae60; font-size:12px; font-weight:bold;">Rp ${parseInt(dataMax.denda).toLocaleString('id-ID')}</div>
+                        <div style="color:#e94560; font-size:10px; font-weight:bold;">${dataMax.sanksi}</div>
                     </label>
                 </div>
             `;
@@ -366,7 +368,6 @@ function hitungUU() {
     document.getElementById('uu-total-denda').innerText = "Rp " + total.toLocaleString('id-ID');
 }
 
-// FUNGSI KIRIM KE DISCORD
 async function kirimWarningPelanggaran() {
     const selected = document.querySelectorAll('.cb-uu:checked');
     if (selected.length === 0) return alert("Silakan pilih pelanggaran terlebih dahulu!");
@@ -375,16 +376,24 @@ async function kirimWarningPelanggaran() {
     let totalDenda = 0;
 
     selected.forEach(cb => {
-        const denda = parseInt(cb.dataset.denda);
-        const hukuman = cb.dataset.hukuman; // Mengambil sanksi (Mutasi/Teguran)
+        const denda = parseInt(cb.dataset.denda || 0);
+        
+        // PERBAIKAN DI SINI: Samakan dengan properti di dataset modal (data-sanksi)
+        // Jika di modal pakai data-hukuman, gunakan cb.dataset.hukuman
+        // Jika di modal pakai data-sanksi, gunakan cb.dataset.sanksi
+        const sanksiTambahan = cb.dataset.sanksi || cb.dataset.hukuman || "-"; 
+        
         const label = cb.dataset.label;
 
         totalDenda += denda;
-        detailPelanggaran.push(`- **${label}**: Rp ${denda.toLocaleString('id-ID')} + [${hukuman}]`);
+        
+        // Format teks yang akan dikirim ke Discord
+        detailPelanggaran.push(`- **${label}**: Rp ${denda.toLocaleString('id-ID')} | *Sanksi: ${sanksiTambahan}*`);
     });
 
-    // Kalkulasi Total SP (Current Warn + 1)
-    const totalSPBaru = (tempWarningData.currentWarn || 0) + 1;
+    // Kalkulasi Total SP (Ambil data SP saat ini + 1)
+    const currentSP = parseInt(tempWarningData.currentWarn || 0);
+    const totalSPBaru = currentSP + 1;
 
     const logPayload = {
         "content": "@everyone <@&1444908462067945623>",
@@ -394,19 +403,25 @@ async function kirimWarningPelanggaran() {
             "description": [
                 `**Nama Anggota:** ${tempWarningData.nama_anggota}`,
                 `**Pangkat:** ${tempWarningData.pangkat_anggota}`,
-                `**Status SP Sekarang:** \`SP ${totalSPBaru}\``,
+                `**Status SP:** \`SP ${totalSPBaru}\` *(Sebelumnya SP ${currentSP})*`,
                 `\n**RINCIAN PELANGGARAN:**`,
                 detailPelanggaran.join('\n'),
                 `\n**TOTAL DENDA:** Rp ${totalDenda.toLocaleString('id-ID')}`,
                 `**PEMBERI SANKSI:** ${tempWarningData.adminName}`
             ].join('\n'),
-            "footer": { "text": "SAPD Admin Panel Pro • " + new Date().toLocaleString('id-ID') }
+            "footer": { 
+                "text": "SAPD Admin Panel Pro • " + new Date().toLocaleString('id-ID') 
+            },
+            "timestamp": new Date()
         }]
     };
 
-    // Jalankan eksekusi final ke database/webhook
+    // Jalankan eksekusi final
     await executeWarningFinal(tempWarningData.discord_id, totalSPBaru, logPayload, tempWarningData.nama_anggota);
-    document.getElementById('modal-pelanggaran-uu').style.display = "none";
+    
+    // Tutup modal
+    const modal = document.getElementById('modal-pelanggaran-uu');
+    if (modal) modal.style.display = "none";
 }
 // Fungsi Internal Pengiriman Final
 async function executeWarningFinal(discord_id, newCount, payload, nama) {
