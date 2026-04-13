@@ -287,56 +287,75 @@ function bukaModalPelanggaranUU() {
     const sections = doc.querySelectorAll('section');
 
     sections.forEach(sec => {
-        const title = sec.querySelector('.bab-title').innerText;
         const pasals = sec.querySelectorAll('.pasal');
         
         pasals.forEach(pas => {
             const label = pas.querySelector('.pasal-label').innerText;
             const penaltyBox = pas.querySelector('.penalty-box');
-            
-            // Ambil teks murni untuk pengolahan denda dan sanksi
-            const rawText = penaltyBox.innerText; 
-            
-            // Regex untuk denda
-            const mMin = rawText.match(/MIN: Denda Rp ([\d.]+)/);
-            const mMax = rawText.match(/MAX: Denda Rp ([\d.]+)/);
-            const dMin = mMin ? parseInt(mMin[1].replace(/\./g, '')) : 0;
-            const dMax = mMax ? parseInt(mMax[1].replace(/\./g, '')) : 0;
+            const fullText = penaltyBox.innerText; 
 
-            // Ambil sanksi tambahan (teks setelah tanda |)
-            const sanksiMin = rawText.split('\n')[0].split('|')[1]?.trim() || "-";
-            const sanksiMax = rawText.split('\n')[1]?.split('|')[1]?.trim() || "-";
+            // Pisahkan baris secara bersih (buang baris kosong)
+            const lines = fullText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            
+            // Cari baris yang mengandung kata MIN dan MAX secara spesifik
+            const lineMin = lines.find(l => l.includes("MIN:")) || "";
+            const lineMax = lines.find(l => l.includes("MAX:")) || "";
+
+            // Ambil Angka Denda
+            const dMin = (lineMin.match(/[\d.]+/g) || ["0"])[0].replace(/\./g, '');
+            const dMax = (lineMax.match(/[\d.]+/g) || ["0"])[0].replace(/\./g, '');
+
+            // Ambil Sanksi (Teks setelah tanda |)
+            const sMin = lineMin.split('|')[1]?.trim() || "Teguran";
+            const sMax = lineMax.split('|')[1]?.trim() || "Mutasi/Demote";
 
             const div = document.createElement('div');
-            div.style.cssText = "margin-bottom: 12px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid #30475e;";
+            div.style.cssText = "margin-bottom: 15px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid #30475e;";
             div.innerHTML = `
-                <div style="color:#00adb5; font-weight:bold; font-size:13px;">${label}</div>
-                <div style="font-size:11px; color:#888; margin-bottom:10px;">${rawText}</div>
+                <div style="color:#00adb5; font-weight:bold; font-size:13px; margin-bottom:8px;">${label}</div>
                 
                 <div style="display:flex; gap:10px;">
-                    <label style="flex:1; cursor:pointer; background:#1a1a2e; padding:8px; border-radius:5px; border:1px solid #30475e; font-size:11px;">
-                        <input type="radio" name="select_${label.replace(/\s/g,'')}" class="cb-uu" 
+                    <label style="flex:1; cursor:pointer; background:#1a1a2e; padding:10px; border-radius:5px; border:1px solid #30475e; transition:0.2s;">
+                        <input type="radio" name="radio_${label.replace(/\s/g,'')}" class="cb-uu" 
                             data-denda="${dMin}" 
-                            data-sanksi="${sanksiMin}"
+                            data-sanksi="${sMin}"
                             data-label="${label} (MIN)" onchange="hitungUU()">
-                        <b>MIN</b><br>Rp ${dMin.toLocaleString()}<br><span style="color:#e94560">${sanksiMin}</span>
+                        <div style="font-weight:bold; color:#fff; font-size:11px;">MIN</div>
+                        <div style="color:#27ae60; font-size:12px;">Rp ${parseInt(dMin).toLocaleString()}</div>
+                        <div style="color:#e94560; font-size:10px; margin-top:4px;">${sMin}</div>
                     </label>
-                    <label style="flex:1; cursor:pointer; background:#1a1a2e; padding:8px; border-radius:5px; border:1px solid #30475e; font-size:11px;">
-                        <input type="radio" name="select_${label.replace(/\s/g,'')}" class="cb-uu" 
+
+                    <label style="flex:1; cursor:pointer; background:#1a1a2e; padding:10px; border-radius:5px; border:1px solid #30475e; transition:0.2s;">
+                        <input type="radio" name="radio_${label.replace(/\s/g,'')}" class="cb-uu" 
                             data-denda="${dMax}" 
-                            data-sanksi="${sanksiMax}"
+                            data-sanksi="${sMax}"
                             data-label="${label} (MAX)" onchange="hitungUU()">
-                        <b>MAX</b><br>Rp ${dMax.toLocaleString()}<br><span style="color:#e94560">${sanksiMax}</span>
+                        <div style="font-weight:bold; color:#fff; font-size:11px;">MAX</div>
+                        <div style="color:#27ae60; font-size:12px;">Rp ${parseInt(dMax).toLocaleString()}</div>
+                        <div style="color:#e94560; font-size:10px; margin-top:4px;">${sMax}</div>
                     </label>
                 </div>
             `;
             container.appendChild(div);
         });
     });
+    
+    // Reset total denda di UI saat buka modal
+    document.getElementById('uu-total-denda').innerText = "Rp 0";
     modalUU.style.display = "flex";
 }
 
-// 2. UPDATE FUNGSI KIRIM (Agar sanksi masuk ke deskripsi Discord)
+// FUNGSI HITUNG OTOMATIS SAAT DIKLIK
+function hitungUU() {
+    const selected = document.querySelectorAll('.cb-uu:checked');
+    let total = 0;
+    selected.forEach(item => {
+        total += parseInt(item.dataset.denda || 0);
+    });
+    document.getElementById('uu-total-denda').innerText = "Rp " + total.toLocaleString('id-ID');
+}
+
+// FUNGSI KIRIM KE DISCORD
 async function kirimWarningPelanggaran() {
     const selected = document.querySelectorAll('.cb-uu:checked');
     if (selected.length === 0) return alert("Pilih minimal satu pelanggaran!");
@@ -350,22 +369,22 @@ async function kirimWarningPelanggaran() {
         const label = cb.dataset.label;
 
         totalDenda += denda;
-        // Gabungkan Label, Denda, dan Sanksi Tambahan
-        detailPelanggaran.push(`- **${label}**: Rp ${denda.toLocaleString()} + [${sanksi}]`);
+        // Format: Nama Pasal (MIN/MAX): Rp 5.000 + [Hukuman]
+        detailPelanggaran.push(`- **${label}**: Rp ${denda.toLocaleString('id-ID')} + [${sanksi}]`);
     });
 
-    const newWarnCount = tempWarningData.currentWarn + 1;
+    const newWarnCount = (tempWarningData.currentWarn || 0) + 1;
     const logPayload = {
         "content": "@everyone <@&1444908462067945623>",
         "embeds": [{
             "title": `⚖️ SURAT PERINGATAN (SP - ${newWarnCount}) - PELANGGARAN UU`,
-            "color": 16711680,
-            "description": `**Nama Anggota:** ${tempWarningData.nama_anggota}\n**Pangkat:** ${tempWarningData.pangkat_anggota}\n\n**Rincian Pelanggaran:**\n${detailPelanggaran.join('\n')}\n\n**Total Denda:** Rp ${totalDenda.toLocaleString('id-ID')}\n**Pemberi:** ${tempWarningData.adminName}`,
-            "footer": { "text": "SAPD Administration System" },
-            "timestamp": new Date()
+            "color": 15548997, // Warna Merah Terang
+            "description": `**Nama Anggota:** ${tempWarningData.nama_anggota}\n**Pangkat:** ${tempWarningData.pangkat_anggota}\n\n**Rincian Pelanggaran:**\n${detailPelanggaran.join('\n')}\n\n**Total Denda Keseluruhan:** Rp ${totalDenda.toLocaleString('id-ID')}\n\n**Pemberi Sanksi:** ${tempWarningData.adminName}`,
+            "footer": { "text": "SAPD Administration System | " + new Date().toLocaleString() }
         }]
     };
 
+    // Pastikan fungsi executeWarningFinal tersedia di rekap.js
     await executeWarningFinal(tempWarningData.discord_id, newWarnCount, logPayload, tempWarningData.nama_anggota);
     document.getElementById('modal-pelanggaran-uu').style.display = "none";
 }
