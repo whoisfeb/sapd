@@ -10,9 +10,10 @@ const client = new Client({
 });
 
 // --- KONFIGURASI (MENGGUNAKAN SECRETS GITHUB) ---
-// Bagian ini akan mengambil data dari menu "Secrets" yang kamu isi di GitHub tadi
 const TOKEN = process.env.DISCORD_BOT_TOKEN; 
 const PROMOTION_CHANNEL_ID = process.env.DISCORD_PROMOTION_CHANNEL_ID || '1444904948692422756';
+// GANTI ID DI BAWAH INI DENGAN ID CHANNEL NOTIF KAMU
+const NOTIF_CHANNEL_ID = '1493137414175326249'; 
 
 // 1. Mapping ID Role ke Singkatan Nickname
 const rankPrefixes = {
@@ -78,8 +79,15 @@ const allGroupIDs = [
     '1444910578266148897' // HIGH COMMAND     
 ];
 
+// NOTIFIKASI AKTIF (TANPA HAPUS OTOMATIS)
 client.once('ready', () => {
     console.log(`Bot login sebagai ${client.user.tag}`);
+    
+    const notifChannel = client.channels.cache.get(NOTIF_CHANNEL_ID);
+    if (notifChannel) {
+        notifChannel.send(`✅ **Sistem SAPD Online** | ${new Date().toLocaleString('id-ID')} | Status: Menunggu Promosi... \n\n*Bot ini akan otomatis memproses promosi berdasarkan format yang ditentukan di channel promosi.*\n**Pastikan format promosi benar agar bot dapat memproses dengan lancar.**\n**Ketika tidak ada aktifitas yang sesuai format di channel <#1444904948692422756> maka bot akan offline\n @everyone`)
+        .catch(console.error);
+    }
 });
 
 client.on('messageCreate', async (message) => {
@@ -108,7 +116,7 @@ client.on('messageCreate', async (message) => {
                 const newRankID = newRankMatch ? newRankMatch[1] : null;
 
                 if (prevRankMatch) await member.roles.remove(prevRankMatch[1]).catch(() => null);
-                if (newRankMatch) await member.roles.add(newRankID).catch(console.error);
+                if (newRankID) await member.roles.add(newRankID).catch(console.error);
 
                 if (prevDivs) {
                     for (const div of prevDivs) await member.roles.remove(div.replace(/[<@&>]/g, '')).catch(() => null);
