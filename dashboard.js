@@ -128,6 +128,12 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
     btn.innerText = "Memproses...";
 
     try {
+        // --- VALIDASI WAJIB FOTO (UPDATE DISINI) ---
+        if (statusAbsen === "HADIR" && selectedFiles.length === 0) {
+            throw new Error("Wajib melampirkan bukti foto (SS SAMP) untuk status HADIR!");
+        }
+        // -------------------------------------------
+
         let dateList = [];
         if (statusAbsen === "CUTI") {
             let dStart = new Date(document.getElementById('cuti_mulai').value);
@@ -142,6 +148,7 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
         }
 
         let allImgUrls = [];
+        // Pastikan upload hanya jalan jika status HADIR (Logika sudah aman)
         if (statusAbsen === "HADIR" && selectedFiles.length > 0) {
             btn.innerText = `Mengunggah ${selectedFiles.length} Foto...`;
             for (let file of selectedFiles) {
@@ -207,6 +214,7 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
         btn.innerText = "Kirim Laporan";
     }
 });
+
 
 // --- FUNGSI PENDUKUNG ---
 function renderPreview() {

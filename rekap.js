@@ -14,9 +14,7 @@ let currentWeekOffset = 0;
 let userWeekly = {}; 
 let tempWarningData = {}; // Menyimpan data sementara saat tombol klik
 
-// ============================================================
-// --- [ADDON] LOGIKA AUTOMASI DAFTAR ISI UU (GROUPING HIRARKI) ---
-// ============================================================
+// --- [ADDON] LOGIKA AUTOMASI DAFTAR ISI UU (GROUPING ANTI-DUPLIKAT) ---
 function generateRekapUU() {
     if (typeof kodeHTML === 'undefined') return {};
     const parser = new DOMParser();
@@ -31,19 +29,25 @@ function generateRekapUU() {
         const ayatLabel = section.querySelector('.ayat-label')?.innerText || "";
         const idBab = section.id;
 
-        // Jika BAB belum ada di objek, buat wadahnya
+        // 1. Buat Grup BAB jika belum ada
         if (!rekapTerstruktur[babTitle]) {
             rekapTerstruktur[babTitle] = {
-                id: idBab, 
-                pasalList: []
+                id: idBab,
+                pasalMap: {} // Menggunakan map agar Pasal tidak duplikat
             };
         }
 
-        // Masukkan Pasal dan Ayat ke dalam BAB yang sama
-        rekapTerstruktur[babTitle].pasalList.push({
-            label: pasalLabel,
-            ayat: ayatLabel
-        });
+        // 2. Buat Grup PASAL di dalam BAB tersebut jika belum ada
+        if (!rekapTerstruktur[babTitle].pasalMap[pasalLabel]) {
+            rekapTerstruktur[babTitle].pasalMap[pasalLabel] = {
+                ayatList: [] // List untuk menampung banyak Ayat
+            };
+        }
+
+        // 3. Masukkan Ayat ke dalam Pasal (Hanya jika ayat tersebut belum ada)
+        if (ayatLabel && !rekapTerstruktur[babTitle].pasalMap[pasalLabel].ayatList.includes(ayatLabel)) {
+            rekapTerstruktur[babTitle].pasalMap[pasalLabel].ayatList.push(ayatLabel);
+        }
     });
     return rekapTerstruktur;
 }
@@ -60,22 +64,33 @@ function renderDaftarIsi() {
         
         htmlMarkup += `
             <div class="bab-box" style="background: #222831; border: 1px solid #393e46; border-radius: 8px; margin-bottom: 15px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-                <div style="background: #00adb5; color: #eeeeee; padding: 12px; font-weight: 900; font-size: 16px; text-align: center; border-bottom: 2px solid #393e46;">
+                <div style="background: #00adb5; color: #eeeeee; padding: 12px; font-weight: 900; font-size: 15px; text-align: center; border-bottom: 2px solid #393e46; text-transform: uppercase;">
                     <a href="#${bab.id}" style="color: inherit; text-decoration: none; display: block;">${babName}</a>
                 </div>
                 
                 <div style="padding: 10px;">
         `;
 
-        bab.pasalList.forEach((p, index) => {
-            const isLast = index === bab.pasalList.length - 1;
+        // Looping Pasal di dalam BAB
+        for (const pasalName in bab.pasalMap) {
+            const pasalObj = bab.pasalMap[pasalName];
+            
             htmlMarkup += `
-                <div style="${isLast ? '' : 'border-bottom: 1px solid #393e46;'} padding: 10px 0;">
-                    <div style="color: #fff; font-weight: bold; font-size: 14px; text-transform: uppercase;">${p.label}</div>
-                    ${p.ayat ? `<div style="color: #00adb5; font-size: 12px; margin-top: 4px; font-weight: 600;">${p.ayat}</div>` : ''}
+                <div style="border-bottom: 1px solid #393e46; padding: 10px 0;">
+                    <div style="color: #fff; font-weight: bold; font-size: 13px; text-transform: uppercase;">${pasalName}</div>
+                    <div style="margin-top: 5px; display: flex; flex-direction: column; gap: 3px;">
+            `;
+
+            // Looping Ayat di dalam Pasal
+            pasalObj.ayatList.forEach(ayat => {
+                htmlMarkup += `<div style="color: #00adb5; font-size: 11px; font-weight: 600; padding-left: 5px; border-left: 2px solid #00adb5;">${ayat}</div>`;
+            });
+
+            htmlMarkup += `
+                    </div>
                 </div>
             `;
-        });
+        }
 
         htmlMarkup += `
                 </div>
