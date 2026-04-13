@@ -106,8 +106,10 @@ async function checkAuth() {
         localStorage.setItem("is_admin", "false"); 
         return accessDenied();
     } else {
+        // Jika benar admin, baru tampilkan halaman dan muat data
         document.body.style.display = "block";
         loadData(); 
+        renderDaftarIsi(); // <--- PASTIKAN BARIS INI ADA
     }
 }
 
