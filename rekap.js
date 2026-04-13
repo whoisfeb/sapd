@@ -174,14 +174,16 @@ async function loadData() {
             const status = ketAsli.includes("IZIN") ? "IZIN" : (ketAsli.includes("CUTI") ? "CUTI" : "HADIR");
 
             userWeekly[discordId].days[d] = { 
-                status: status,
-                ket: ketAsli,
+                status: status, 
+                tipe_absen: log.tipe_absen || status, // Tambahkan baris ini
+                ket: (log.jam_duty || "").toUpperCase(),
                 alasan: log.alasan || "-", 
                 waktuDuty: log.jam_duty || "-", 
                 bukti: log.bukti_foto || log.bukti_gambar,
                 tanggalLog: new Date(log.created_at).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' }),
                 divisi: userWeekly[discordId].info.divisi || "-"
             };
+
 
             if (status === "HADIR") {
                 if (!userWeekly[discordId].uniqueDates.has(dateKey)) {
