@@ -85,7 +85,7 @@ client.once('ready', () => {
     
     const notifChannel = client.channels.cache.get(NOTIF_CHANNEL_ID);
     if (notifChannel) {
-        notifChannel.send(`✅ **Sistem SAPD Online** | ${new Date().toLocaleString('id-ID')} | Status: Menunggu Promosi... \n\n*Bot ini akan otomatis memproses promosi berdasarkan format yang ditentukan di channel promosi.*\n**Pastikan format promosi benar agar bot dapat memproses dengan lancar.**\n**Ketika tidak ada aktifitas yang sesuai format di channel <#1444904948692422756> maka bot akan offline\n @everyone`)
+        notifChannel.send(`✅ **Sistem SAPD Online** | ${new Date().toLocaleString('id-ID')} | Status: Menunggu Promosi... \n\n*Bot ini akan otomatis memproses promosi berdasarkan format yang ditentukan di channel promosi.*\n*Pastikan format promosi benar agar bot dapat memproses dengan lancar.*\n*Ketika tidak ada aktifitas yang sesuai format di channel <#1444904948692422756> maka bot akan offline*\n @everyone`)
         .catch(console.error);
     }
 });
