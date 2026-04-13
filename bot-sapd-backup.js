@@ -13,7 +13,7 @@ const client = new Client({
     ] 
 });
 
-// 2. MAPPING DATA
+// 2. MAPPING DATA (Pangkat & Divisi)
 const PANGKAT_MAP = {
     "1444909938001580257": "CHIEF OF POLICE",
     "1444909771181522974": "ASSISTANT CHIEF OF POLICE",
@@ -47,18 +47,21 @@ const DIVISI_MAP = {
 
 // 3. KONFIGURASI ID
 const ANNOUNCEMENT_CHANNEL_ID = "1492812998379700246"; 
-const REQUIRED_ROLE_ID = "1444908462067945623"; 
-const ADMIN_ROLE_ID = "1444910578266148897"; 
+const REQUIRED_ROLE_ID = "1444908462067945623"; // Role Wajib (SAPD)
+const ADMIN_ROLE_ID = "1444910578266148897"; // CONTOH: ID Role Chief (Sesuaikan dengan ID Role Admin/High Command kamu)
 
-// FUNGSI UTAMA PENGECEKAN
-async function runSapdTask() {
-    console.log(`[${new Date().toLocaleString('id-ID')}] Memulai tugas rutin SAPD...`);
+client.once('ready', async () => {
+    console.log(`Bot berhasil login sebagai ${client.user.tag}`);
     
     const guild = client.guilds.cache.get(process.env.DISCORD_GUILD_ID);
-    if (!guild) return console.error("Error: Server Discord tidak ditemukan!");
+    if (!guild) {
+        console.error("Error: Server Discord tidak ditemukan!");
+        process.exit();
+    }
 
     try {
-        // --- SINKRONISASI DATA ---
+        // --- BAGIAN A: SINKRONISASI DATA ---
+        console.log("Memulai sinkronisasi member...");
         const members = await guild.members.fetch();
         const dataToUpsert = [];
         const activeDiscordIds = [];
@@ -76,16 +79,24 @@ async function runSapdTask() {
 
                 const freshName = member.nickname || member.user.globalName || member.user.username;
                 activeDiscordIds.push(member.id);
+
+                // CEK APAKAH DIA ADMIN (Punya role High Command?)
                 const isUserAdmin = member.roles.cache.has(ADMIN_ROLE_ID);
 
+                // Update RIWAYAT ABSENSI (Agar nama/pangkat di log lama juga update)
                 updateTasks.push(
-                    supabase.from('absensi_sapd').update({
-                        nama_anggota: freshName,
-                        pangkat: userPangkat,
-                        divisi: userDivisi
-                    }).eq('discord_id', member.id)
+                    supabase
+                        .from('absensi_sapd')
+                        .update({
+                            nama_anggota: freshName,
+                            pangkat: userPangkat,
+                            divisi: userDivisi
+                        })
+                        .eq('discord_id', member.id)
                 );
 
+                // Siapkan data untuk PROFIL (users_master)
+                // MENYERTAKAN is_admin AGAR TERUPDATE DI SUPABASE
                 dataToUpsert.push({
                     discord_id: member.id,
                     nama_anggota: freshName,
@@ -97,19 +108,31 @@ async function runSapdTask() {
             }
         }
 
+        // Jalankan semua update riwayat absensi
         await Promise.all(updateTasks);
 
+        // PEMBERSIHAN DATABASE: Hapus yang sudah tidak punya Role SAPD
         if (activeDiscordIds.length > 0) {
-            await supabase.from('users_master').delete().not('discord_id', 'in', `(${activeDiscordIds.join(',')})`);
+            await supabase
+                .from('users_master')
+                .delete()
+                .not('discord_id', 'in', `(${activeDiscordIds.join(',')})`);
         }
 
-        const { error: upsertError } = await supabase.from('users_master').upsert(dataToUpsert, { onConflict: 'discord_id' });
-        if (upsertError) throw upsertError;
-        console.log("Sinkronisasi Berhasil.");
+        // Jalankan Upsert ke profil (users_master)
+        const { error: upsertError } = await supabase
+            .from('users_master')
+            .upsert(dataToUpsert, { onConflict: 'discord_id' });
 
-        // --- BROADCAST PENGUMUMAN (WIB) ---
+        if (upsertError) throw upsertError;
+        console.log("Sinkronisasi Profil & Riwayat Berhasil!");
+
+        // --- BAGIAN B: BROADCAST PENGUMUMAN (WIB) ---
         const formatter = new Intl.DateTimeFormat('id-ID', {
-            timeZone: 'Asia/Jakarta', hour: 'numeric', minute: 'numeric', hour12: false
+            timeZone: 'Asia/Jakarta',
+            hour: 'numeric',
+            minute: 'numeric',
+            hour12: false
         });
         
         const formattedDate = formatter.format(new Date());
@@ -117,37 +140,29 @@ async function runSapdTask() {
         const jam = parseInt(jamStr);
         const menit = parseInt(menitStr);
 
+        console.log(`Waktu saat ini (WIB): ${jam}:${menit}`);
+
         const channel = await client.channels.fetch(ANNOUNCEMENT_CHANNEL_ID);
+        
         if (channel) {
-            // Cek jika jam 19:30 - 19:40 (dibatasi agar tidak spam setiap menit dalam jam tersebut)
-            if (jam === 19 && menit >= 30 && menit <= 40) { 
+            // Jam 19:30 - 19:59 WIB
+            if (jam === 19 && menit >= 30) { 
                 await channel.send("📢 **PENGUMUMAN DUTY**\nWAKTUNYA DUTY JIKA BERHALANGAN SILAHKAN IZIN ATAU CUTI DI https://san-andreas-police-departement.netlify.app/\n\n@everyone");
+                console.log("Pesan Duty terkirim.");
             } 
-            else if (jam === 22 && menit <= 10) {
+            // Jam 22:00 WIB
+            else if (jam === 22) {
                 await channel.send("📢 **REMINDER ABSENSI**\nJANGAN LUPA UNTUK MENGISI KEHADIRAN DI https://san-andreas-police-departement.netlify.app/\n\n@everyone");
+                console.log("Pesan Absensi terkirim.");
             }
         }
+
     } catch (err) {
-        console.error("Terjadi kesalahan:", err.message);
+        console.error("Terjadi kesalahan fatal:", err.message);
+    } finally {
+        console.log("Proses selesai, bot akan dimatikan dalam 5 detik.");
+        setTimeout(() => process.exit(), 5000);
     }
-}
-
-client.once('ready', () => {
-    console.log(`Bot Pengecek SAPD aktif sebagai ${client.user.tag}`);
-    
-    // Jalankan tugas pertama kali saat bot nyala
-    runSapdTask();
-
-    // Jalankan tugas SETIAP 10 MENIT selama bot standby (6 jam)
-    setInterval(() => {
-        runSapdTask();
-    }, 600000); // 600.000 ms = 10 menit
-});
-
-// Menangkap sinyal berhenti agar tidak error di log
-process.on('SIGTERM', () => {
-    console.log("Bot dimatikan oleh sistem.");
-    process.exit(0);
 });
 
 client.login(process.env.DISCORD_BOT_TOKEN);
