@@ -50,7 +50,7 @@ const kodeHTML = `
                 <div class="ayat"><div class="ayat-n">1.</div><div>Personil yang dijatuhi hukuman demosi wajib melepaskan jabatan struktural dalam waktu 1x24 jam.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    SANKSI: Pemotongan Gaji 30% selama 2 Minggu.
+                    MIN: - | Pemotongan Gaji 30% selama 2 Minggu.
                 </div>
             </div>
         </section>

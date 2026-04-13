@@ -14,6 +14,58 @@ let currentWeekOffset = 0;
 let userWeekly = {}; 
 let tempWarningData = {}; // Menyimpan data sementara saat tombol klik
 
+// --- [ADDON] LOGIKA AUTOMASI DAFTAR ISI UU (VERSI TERKELOMPOK) ---
+function generateRekapUU() {
+    if (typeof kodeHTML === 'undefined') return [];
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(kodeHTML, 'text/html');
+    const sections = doc.querySelectorAll('section');
+    const rekapData = [];
+
+    sections.forEach((section) => {
+        // Mengambil teks BAB (Contoh: "BAB I : HIERARKI")
+        const babTitle = section.querySelector('.bab-title')?.innerText || "TANPA BAB";
+        // Mengambil teks Pasal (Contoh: "PASAL 1")
+        const pasalLabel = section.querySelector('.pasal-label')?.innerText || "";
+        // Mengambil teks Ayat jika ada (Contoh: "AYAT 1")
+        const ayatLabel = section.querySelector('.ayat-label')?.innerText || "";
+        
+        const idBab = section.id;
+        rekapData.push({ id: idBab, judul: babTitle, pasal: pasalLabel, ayat: ayatLabel });
+    });
+    return rekapData;
+}
+
+function renderDaftarIsi() {
+    const data = generateRekapUU();
+    const container = document.getElementById('rekap-list-container');
+    if (!container || data.length === 0) return;
+
+    let htmlMarkup = '<div class="rekap-wrapper" style="font-family: Arial, sans-serif; color: #eee;">';
+    
+    data.forEach(item => {
+        htmlMarkup += `
+            <div class="rekap-group" style="margin-bottom: 20px; padding: 10px; border-left: 4px solid #00adb5; background: rgba(0, 173, 181, 0.05);">
+                <a href="#${item.id}" style="text-decoration: none; color: inherit;">
+                    <div class="rekap-bab" style="font-size: 18px; font-weight: 900; color: #00adb5; text-transform: uppercase; letter-spacing: 1px;">
+                        ${item.judul}
+                    </div>
+                    <div class="rekap-pasal" style="font-size: 15px; font-weight: bold; color: #fff; margin-top: 5px; border-top: 1px solid #444; padding-top: 5px;">
+                        ${item.pasal}
+                    </div>
+                    ${item.ayat ? `
+                    <div class="rekap-ayat" style="font-size: 13px; color: #bbb; font-style: italic;">
+                        ${item.ayat}
+                    </div>` : ''}
+                </a>
+            </div>
+        `;
+    });
+
+    htmlMarkup += '</div>';
+    container.innerHTML = htmlMarkup;
+}
+
 // --- 2. SISTEM KEAMANAN & AUTHENTICATION ---
 async function checkAuth() {
     const discordId = localStorage.getItem("discord_id");
@@ -283,7 +335,7 @@ function bukaModalPelanggaranUU() {
     // PERBAIKAN: Menampilkan Total SP yang dimiliki user saat ini
     const spSekarang = tempWarningData.currentWarn || 0;
     document.getElementById('uu-sp-saat-ini').innerText = spSekarang;
-    
+
     const container = document.getElementById('uu-list-container');
     container.innerHTML = "";
     
