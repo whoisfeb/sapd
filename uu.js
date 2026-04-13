@@ -552,8 +552,8 @@ const kodeHTML = `
                 <div class="ayat"><div class="ayat-n">2.</div><div>Tidak menghadiri persidangan internal dengan alasan apapun .</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 2:</span>
-                    MIN: Denda Rp Maksimal | Hukuman Maksimal sesuai pasal yang di langgar<br>
-                    MAX: Denda Rp Maksimal | Hukuman Maksimal sesuai pasal yang di langgar
+                    MIN: Denda Rp - | Denda & Hukuman Maksimal sesuai pasal yang di langgar<br>
+                    MAX: Denda Rp - | Denda & Hukuman Maksimal sesuai pasal yang di langgar
                 </div>
             </div>
         </section>
