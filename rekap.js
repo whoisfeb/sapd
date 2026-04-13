@@ -24,28 +24,27 @@ function generateRekapUU() {
     const rekapTerstruktur = {};
 
     sections.forEach((section) => {
-        // Ambil teks asli dan bersihkan spasi berlebih
-        const babTitle = section.querySelector('.bab-title')?.innerText.trim() || "TANPA BAB";
-        const pasalLabel = section.querySelector('.pasal-label')?.innerText.trim() || "Tanpa Pasal";
-        const ayatLabel = section.querySelector('.ayat-label')?.innerText.trim() || "";
+        const babTitle = section.querySelector('.bab-title')?.innerText || "TANPA BAB";
+        const pasalLabel = section.querySelector('.pasal-label')?.innerText || "Tanpa Pasal";
+        const ayatLabel = section.querySelector('.ayat-label')?.innerText || "";
         const idBab = section.id;
 
-        // 1. Buat Grup BAB jika belum ada (Kunci utama agar BAB tidak berulang)
+        // 1. Buat Grup BAB jika belum ada
         if (!rekapTerstruktur[babTitle]) {
             rekapTerstruktur[babTitle] = {
                 id: idBab,
-                pasalMap: {} 
+                pasalMap: {} // Menggunakan map agar Pasal tidak duplikat
             };
         }
 
         // 2. Buat Grup PASAL di dalam BAB tersebut jika belum ada
         if (!rekapTerstruktur[babTitle].pasalMap[pasalLabel]) {
             rekapTerstruktur[babTitle].pasalMap[pasalLabel] = {
-                ayatList: [] 
+                ayatList: [] // List untuk menampung banyak Ayat
             };
         }
 
-        // 3. Masukkan Ayat ke dalam Pasal (Hanya jika ayat belum ada di list tersebut)
+        // 3. Masukkan Ayat ke dalam Pasal (Hanya jika ayat tersebut belum ada)
         if (ayatLabel && !rekapTerstruktur[babTitle].pasalMap[pasalLabel].ayatList.includes(ayatLabel)) {
             rekapTerstruktur[babTitle].pasalMap[pasalLabel].ayatList.push(ayatLabel);
         }
@@ -65,29 +64,26 @@ function renderDaftarIsi() {
         
         htmlMarkup += `
             <div class="bab-box" style="background: #222831; border: 1px solid #393e46; border-radius: 8px; margin-bottom: 15px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-                <div style="background: #00adb5; color: #eeeeee; padding: 12px; font-weight: 900; font-size: 14px; text-align: center; border-bottom: 2px solid #393e46; text-transform: uppercase; line-height: 1.4;">
+                <div style="background: #00adb5; color: #eeeeee; padding: 12px; font-weight: 900; font-size: 15px; text-align: center; border-bottom: 2px solid #393e46; text-transform: uppercase;">
                     <a href="#${bab.id}" style="color: inherit; text-decoration: none; display: block;">${babName}</a>
                 </div>
                 
-                <div style="padding: 5px 12px;">
+                <div style="padding: 10px;">
         `;
 
-        // Looping Pasal-pasal yang sudah dikelompokkan
+        // Looping Pasal di dalam BAB
         for (const pasalName in bab.pasalMap) {
             const pasalObj = bab.pasalMap[pasalName];
             
             htmlMarkup += `
-                <div style="border-bottom: 1px solid #333; padding: 10px 0;">
+                <div style="border-bottom: 1px solid #393e46; padding: 10px 0;">
                     <div style="color: #fff; font-weight: bold; font-size: 13px; text-transform: uppercase;">${pasalName}</div>
-                    <div style="margin-top: 6px; display: flex; flex-direction: column; gap: 4px;">
+                    <div style="margin-top: 5px; display: flex; flex-direction: column; gap: 3px;">
             `;
 
-            // Looping semua Ayat yang masuk ke pasal ini
+            // Looping Ayat di dalam Pasal
             pasalObj.ayatList.forEach(ayat => {
-                htmlMarkup += `
-                    <div style="color: #00adb5; font-size: 11px; font-weight: 600; padding-left: 8px; border-left: 2px solid #00adb5;">
-                        ${ayat}
-                    </div>`;
+                htmlMarkup += `<div style="color: #00adb5; font-size: 11px; font-weight: 600; padding-left: 5px; border-left: 2px solid #00adb5;">${ayat}</div>`;
             });
 
             htmlMarkup += `
@@ -274,13 +270,7 @@ function openDetailPopup(nama, pangkat, data) {
             <div class="pop-row"><div class="pop-label">Waktu</div><div class="pop-colon">:</div><div class="pop-val">${data.waktuDuty}</div></div>
             <div class="pop-row">
                 <div class="pop-label">Status</div><div class="pop-colon">:</div>
-                // Ganti data.status menjadi data.tipe_absen
-                <div class="pop-val">
-                    <span style="background:#00adb5; color:#000; padding:2px 8px; border-radius:4px; font-weight:bold; font-size:11px;">
-                        ${data.tipe_absen || data.status}
-                    </span>
-                </div>
-
+                <div class="pop-val"><span style="background:#00adb5; color:#000; padding:2px 8px; border-radius:4px; font-weight:bold; font-size:11px;">${data.tipe_absen}</span></div>
             </div>
             <div class="pop-row" style="border-bottom:none;">
                 <div class="pop-label">Alasan</div><div class="pop-colon">:</div>
