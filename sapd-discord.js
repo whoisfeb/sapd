@@ -161,4 +161,30 @@ client.on('messageCreate', async (message) => {
     }
 });
 
+// --- FITUR PEMBERITAHUAN SEBELUM OFFLINE ---
+async function sendOfflineNotif() {
+    const notifChannel = client.channels.cache.get(NOTIF_CHANNEL_ID);
+    if (notifChannel) {
+        try {
+            await notifChannel.send(`⚠️ **Sistem SAPD Offline**\n\n*Silahkan tunggu sistem SAPD online kembali\n\n@everyone | ${new Date().toLocaleString('id-ID')} | Status: Berhenti/Timeout. \n*Bot akan aktif kembali otomatis sesuai jadwal atau jika dijalankan manual.*`);
+            console.log("Pesan offline berhasil dikirim.");
+        } catch (err) {
+            console.error("Gagal mengirim pesan offline:", err);
+        }
+    }
+}
+
+// Menangkap sinyal ketika GitHub Actions akan mematikan proses
+process.on('SIGTERM', async () => {
+    console.log("Menerima sinyal SIGTERM, bersiap offline...");
+    await sendOfflineNotif();
+    process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+    console.log("Menerima sinyal SIGINT, bersiap offline...");
+    await sendOfflineNotif();
+    process.exit(0);
+});
+
 client.login(TOKEN);
