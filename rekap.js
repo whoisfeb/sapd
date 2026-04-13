@@ -238,70 +238,15 @@ window.onclick = function(event) {
 
 // --- 5. FITUR WARNING & DISCORD INTEGRATION ---
 async function sendWarning(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank) {
-    if (!confirm(`Kirim SP-${currentWarn + 1} ke Discord?\n(Oleh: ${adminName} - ${adminRank})`)) return;
-    
-    const { mon } = getWeekRange(currentWeekOffset);
-    const u = userWeekly[discord_id];
-    const daftarBolos = [];
-    const hariNames = ["", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-    
-    // --- LOGIKA PEMBATASAN HARI ---
-    // Ambil waktu sekarang dan set ke jam 00:00 hari ini untuk pembanding
-    const hariIni = new Date();
-    hariIni.setHours(0, 0, 0, 0);
+    // Munculkan pilihan: OK untuk Kehadiran, Cancel untuk Pelanggaran UU
+    const pilihan = confirm("Pilih Jenis Peringatan:\n\n[OK] = Warning KEHADIRAN (Otomatis cek bolos)\n[CANCEL] = Warning PELANGGARAN (Pilih Manual dari UU)");
 
-    for(let i = 1; i <= 6; i++) { 
-        // Hitung tanggal untuk setiap kolom hari (Senin=1, Selasa=2, dst)
-        const tglTarget = new Date(mon); 
-        tglTarget.setDate(mon.getDate() + (i - 1)); 
-        tglTarget.setHours(0, 0, 0, 0);
-
-        // Syarat: Jika data kosong DIBAWAH tanggal hari ini (berarti sudah lewat/kemarin)
-        if(!u.days[i] && tglTarget < hariIni) { 
-            daftarBolos.push(`- ${hariNames[i]}, ${tglTarget.toLocaleDateString('id-ID')}`); 
-        } 
-    }
-
-    // Jika admin mengirim di hari Senin atau user rajin sampai kemarin, daftarBolos akan kosong
-    if (daftarBolos.length === 0) {
-        alert("Tidak ditemukan riwayat bolos dari hari Senin sampai kemarin.\nSP tidak dapat dikirim jika belum ada hari yang terlewati.");
-        return;
-    }
-
-    const newWarnCount = currentWarn + 1;
-    const logPayload = {
-        "content": "@everyone <@&1444908462067945623>",
-        "embeds": [{
-            "title": `📋 SURAT PERINGATAN (SP - ${newWarnCount})`,
-            "color": 15285324,
-            "description": `**Tanggal:** ${new Date().toLocaleDateString('id-ID')}\n**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat:** ${pangkat_anggota}\n\n**Alasan Peringatan:**\nTidak memenuhi syarat kehadiran mingguan.\n\n**Detail Ketidakhadiran (s/d Kemarin):**\n${daftarBolos.join('\n')}\n\n**Total SP:** ${newWarnCount}\n\n**Pemberi Peringatan:** ${adminName}\n**Pangkat:** ${adminRank}`,
-            "timestamp": new Date()
-        }]
-    };
-
-    try {
-        // Update database Supabase
-        await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
-        
-        // Kirim ke Discord via Netlify Function
-        const res = await fetch('/.netlify/functions/send-warning', { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                payload: logPayload, 
-                updateList: await updateDiscordList() 
-            }) 
-        });
-
-        if (res.ok) { 
-            alert(`SP-${newWarnCount} berhasil dikirim ke Discord untuk ${nama_anggota}!`); 
-            loadData(); 
-        } else {
-            throw new Error("Gagal mengirim ke Discord.");
-        }
-    } catch (err) {
-        console.error(err);
-        alert("Terjadi kesalahan saat memproses SP.");
+    if (pilihan) {
+        // Jika pilih Kehadiran, jalankan fungsi otomatis
+        executeWarningKehadiran(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank);
+    } else {
+        // Jika pilih Pelanggaran, buka popup checkbox
+        openPelanggaranPopup(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank);
     }
 }
 
@@ -329,6 +274,139 @@ async function removeWarning(discord_id, nama_anggota, pangkat_anggota, currentW
     if (res.ok) { 
         alert("SP Berhasil dicabut!"); 
         loadData(); 
+    }
+}
+
+// --- FUNGSI LOGIKA KEHADIRAN (OTOMATIS) ---
+async function executeWarningKehadiran(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank) {
+    const { mon } = getWeekRange(currentWeekOffset);
+    const u = userWeekly[discord_id];
+    const daftarBolos = [];
+    const hariNames = ["", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    const hariIni = new Date();
+    hariIni.setHours(0, 0, 0, 0);
+
+    for(let i = 1; i <= 6; i++) { 
+        const tglTarget = new Date(mon); 
+        tglTarget.setDate(mon.getDate() + (i - 1)); 
+        tglTarget.setHours(0, 0, 0, 0);
+        if(!u.days[i] && tglTarget < hariIni) { 
+            daftarBolos.push(`- ${hariNames[i]}, ${tglTarget.toLocaleDateString('id-ID')}`); 
+        } 
+    }
+
+    if (daftarBolos.length === 0) {
+        alert("Anggota ini tidak memiliki riwayat bolos s/d kemarin.");
+        return;
+    }
+
+    const newWarnCount = currentWarn + 1;
+    const logPayload = {
+        "content": "@everyone <@&1444908462067945623>",
+        "embeds": [{
+            "title": `📋 SURAT PERINGATAN (KEHADIRAN) - SP ${newWarnCount}`,
+            "color": 15285324,
+            "description": `**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat:** ${pangkat_anggota}\n\n**Detail Ketidakhadiran:**\n${daftarBolos.join('\n')}\n\n**Pemberi Sanksi:** ${adminName}`,
+            "timestamp": new Date()
+        }]
+    };
+
+    await processWarningSubmission(discord_id, newWarnCount, logPayload);
+}
+
+// --- FUNGSI POPUP PELANGGARAN (MANUAL DARI UU.JS) ---
+function openPelanggaranPopup(discord_id, nama, pangkat, currentWarn, adminName, adminRank) {
+    const modal = document.getElementById('modal-detail');
+    const content = document.getElementById('detail-content');
+    const divisi = userWeekly[discord_id]?.info?.divisi || "-";
+
+    // Membuat daftar checkbox dari data UU.js
+    let htmlUU = "";
+    if (typeof DATA_UU !== 'undefined') {
+        htmlUU = DATA_UU.map((item, index) => `
+            <div style="display:flex; align-items:flex-start; gap:10px; margin-bottom:10px; background:#222831; padding:10px; border-radius:5px; border-left:4px solid #e94560;">
+                <input type="checkbox" class="cb-uu" value="${index}" style="margin-top:4px; width:18px; height:18px;">
+                <div style="font-size:12px;">
+                    <div style="font-weight:bold; color:#00adb5;">Pasal ${item.pasal}: ${item.pelanggaran}</div>
+                    <div style="color:#bbb;">Denda: <span style="color:#2ecc71;">$${item.denda.toLocaleString()}</span> | Sanksi: <span style="color:#e94560;">${item.sanksi}</span></div>
+                </div>
+            </div>
+        `).join('');
+    } else {
+        htmlUU = "<p style='color:red;'>Gagal memuat data UU.js. Pastikan file uu.js sudah di-import di rekap.html</p>";
+    }
+
+    content.innerHTML = `
+        <h3 style="text-align:center; color:#e94560; margin-bottom:15px; border-bottom:2px solid #30475e; padding-bottom:10px;">FORM PELANGGARAN ANGGOTA</h3>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:15px; background:#30475e; padding:10px; border-radius:8px; font-size:12px;">
+            <div><b>Nama:</b> ${nama}</div>
+            <div><b>Divisi:</b> ${divisi}</div>
+            <div><b>Pangkat:</b> ${pangkat}</div>
+            <div><b>Status:</b> SP-${currentWarn}</div>
+        </div>
+        <div style="max-height: 350px; overflow-y: auto; padding-right:10px; margin-bottom:20px;">
+            ${htmlUU}
+        </div>
+        <button onclick="submitPelanggaranManual('${discord_id}', '${nama}', '${pangkat}', ${currentWarn}, '${adminName}', '${adminRank}')" 
+                style="width:100%; padding:12px; background:#e94560; color:white; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">
+                KIRIM SURAT PERINGATAN
+        </button>
+    `;
+    modal.style.display = "flex";
+}
+
+// --- FUNGSI SUBMIT PELANGGARAN MANUAL ---
+async function submitPelanggaranManual(discord_id, nama, pangkat, currentWarn, adminName, adminRank) {
+    const selected = Array.from(document.querySelectorAll('.cb-uu:checked')).map(cb => DATA_UU[cb.value]);
+
+    if (selected.length === 0) return alert("Pilih minimal satu jenis pelanggaran!");
+
+    let detailTeks = "";
+    let totalDenda = 0;
+    selected.forEach(p => {
+        detailTeks += `- Pasal ${p.pasal}: ${p.pelanggaran} (${p.sanksi})\n`;
+        totalDenda += p.denda;
+    });
+
+    const newWarnCount = currentWarn + 1;
+    const logPayload = {
+        "content": "@everyone <@&1444908462067945623>",
+        "embeds": [{
+            "title": `⚖️ SURAT PERINGATAN (PELANGGARAN) - SP ${newWarnCount}`,
+            "color": 15105570,
+            "description": `**Nama Anggota:** ${nama} (<@${discord_id}>)\n**Pangkat:** ${pangkat}\n\n**Pelanggaran:**\n${detailTeks}\n**Total Denda:** $${totalDenda.toLocaleString()}\n\n**Pemberi Sanksi:** ${adminName}\n**Pangkat Admin:** ${adminRank}`,
+            "timestamp": new Date()
+        }]
+    };
+
+    if (confirm("Kirim Peringatan Pelanggaran ini?")) {
+        closeDetailPopup();
+        await processWarningSubmission(discord_id, newWarnCount, logPayload);
+    }
+}
+
+async function processWarningSubmission(discord_id, newWarnCount, logPayload) {
+    try {
+        // 1. Update SP di Database
+        await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
+        
+        // 2. Kirim ke Discord (Netlify Function)
+        const res = await fetch('/.netlify/functions/send-warning', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                payload: logPayload, 
+                updateList: await updateDiscordList() 
+            }) 
+        });
+
+        if (res.ok) { 
+            alert("Berhasil! Peringatan telah dikirim dan tercatat."); 
+            loadData(); 
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Gagal memproses peringatan.");
     }
 }
 
