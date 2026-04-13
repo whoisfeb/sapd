@@ -2,7 +2,7 @@ name: SAPD Member Sync
 
 on:
   schedule:
-    # Berjalan setiap jam (menit ke-0)
+    # Berjalan setiap 30 menit
     - cron: '*/30 * * * *'
   # Memungkinkan Anda menjalankan manual melalui tab "Actions"
   workflow_dispatch:
@@ -23,8 +23,9 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Run Sync Script
-        run: node bot-sapd.js # GANTI dengan nama file .js Anda
+      - name: Run Both Bots
+        # GANTI BAGIAN INI: Memanggil npm start agar menjalankan kedua file sekaligus
+        run: npm start 
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
