@@ -14,53 +14,74 @@ let currentWeekOffset = 0;
 let userWeekly = {}; 
 let tempWarningData = {}; // Menyimpan data sementara saat tombol klik
 
-// --- [ADDON] LOGIKA AUTOMASI DAFTAR ISI UU (VERSI TERKELOMPOK) ---
+// ============================================================
+// --- [ADDON] LOGIKA AUTOMASI DAFTAR ISI UU (GROUPING HIRARKI) ---
+// ============================================================
 function generateRekapUU() {
-    if (typeof kodeHTML === 'undefined') return [];
+    if (typeof kodeHTML === 'undefined') return {};
     const parser = new DOMParser();
     const doc = parser.parseFromString(kodeHTML, 'text/html');
     const sections = doc.querySelectorAll('section');
-    const rekapData = [];
+    
+    const rekapTerstruktur = {};
 
     sections.forEach((section) => {
-        // Mengambil teks BAB (Contoh: "BAB I : HIERARKI")
         const babTitle = section.querySelector('.bab-title')?.innerText || "TANPA BAB";
-        // Mengambil teks Pasal (Contoh: "PASAL 1")
-        const pasalLabel = section.querySelector('.pasal-label')?.innerText || "";
-        // Mengambil teks Ayat jika ada (Contoh: "AYAT 1")
+        const pasalLabel = section.querySelector('.pasal-label')?.innerText || "Tanpa Pasal";
         const ayatLabel = section.querySelector('.ayat-label')?.innerText || "";
-        
         const idBab = section.id;
-        rekapData.push({ id: idBab, judul: babTitle, pasal: pasalLabel, ayat: ayatLabel });
+
+        // Jika BAB belum ada di objek, buat wadahnya
+        if (!rekapTerstruktur[babTitle]) {
+            rekapTerstruktur[babTitle] = {
+                id: idBab, 
+                pasalList: []
+            };
+        }
+
+        // Masukkan Pasal dan Ayat ke dalam BAB yang sama
+        rekapTerstruktur[babTitle].pasalList.push({
+            label: pasalLabel,
+            ayat: ayatLabel
+        });
     });
-    return rekapData;
+    return rekapTerstruktur;
 }
 
 function renderDaftarIsi() {
-    const data = generateRekapUU();
+    const groupedData = generateRekapUU();
     const container = document.getElementById('rekap-list-container');
-    if (!container || data.length === 0) return;
+    if (!container) return;
 
-    let htmlMarkup = '<div class="rekap-wrapper" style="font-family: Arial, sans-serif; color: #eee;">';
-    
-    data.forEach(item => {
+    let htmlMarkup = '<div class="rekap-container" style="font-family: sans-serif; padding: 5px;">';
+
+    for (const babName in groupedData) {
+        const bab = groupedData[babName];
+        
         htmlMarkup += `
-            <div class="rekap-group" style="margin-bottom: 20px; padding: 10px; border-left: 4px solid #00adb5; background: rgba(0, 173, 181, 0.05);">
-                <a href="#${item.id}" style="text-decoration: none; color: inherit;">
-                    <div class="rekap-bab" style="font-size: 18px; font-weight: 900; color: #00adb5; text-transform: uppercase; letter-spacing: 1px;">
-                        ${item.judul}
-                    </div>
-                    <div class="rekap-pasal" style="font-size: 15px; font-weight: bold; color: #fff; margin-top: 5px; border-top: 1px solid #444; padding-top: 5px;">
-                        ${item.pasal}
-                    </div>
-                    ${item.ayat ? `
-                    <div class="rekap-ayat" style="font-size: 13px; color: #bbb; font-style: italic;">
-                        ${item.ayat}
-                    </div>` : ''}
-                </a>
+            <div class="bab-box" style="background: #222831; border: 1px solid #393e46; border-radius: 8px; margin-bottom: 15px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                <div style="background: #00adb5; color: #eeeeee; padding: 12px; font-weight: 900; font-size: 16px; text-align: center; border-bottom: 2px solid #393e46;">
+                    <a href="#${bab.id}" style="color: inherit; text-decoration: none; display: block;">${babName}</a>
+                </div>
+                
+                <div style="padding: 10px;">
+        `;
+
+        bab.pasalList.forEach((p, index) => {
+            const isLast = index === bab.pasalList.length - 1;
+            htmlMarkup += `
+                <div style="${isLast ? '' : 'border-bottom: 1px solid #393e46;'} padding: 10px 0;">
+                    <div style="color: #fff; font-weight: bold; font-size: 14px; text-transform: uppercase;">${p.label}</div>
+                    ${p.ayat ? `<div style="color: #00adb5; font-size: 12px; margin-top: 4px; font-weight: 600;">${p.ayat}</div>` : ''}
+                </div>
+            `;
+        });
+
+        htmlMarkup += `
+                </div>
             </div>
         `;
-    });
+    }
 
     htmlMarkup += '</div>';
     container.innerHTML = htmlMarkup;
