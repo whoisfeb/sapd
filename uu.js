@@ -620,7 +620,7 @@ const kodeHTML = `
                 <div class="ayat"><div class="ayat-n">1.</div><div>Kelalaian membayar denda administratif yang telah dijatuhkan secara inkrah.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    SANKSI: Penyitaan aset pribadi senilai denda + bunga 10%.
+                    SANKSI: - | Penyitaan aset pribadi senilai denda + bunga 10%.
                 </div>
             </div>
         </section>
