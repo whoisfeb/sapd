@@ -128,12 +128,12 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
     btn.innerText = "Memproses...";
 
     try {
-        // --- VALIDASI WAJIB FOTO (UPDATE DISINI) ---
+        // --- 1. VALIDASI FOTO KHUSUS HADIR ---
         if (statusAbsen === "HADIR" && selectedFiles.length === 0) {
             throw new Error("Wajib melampirkan bukti foto (SS SAMP) untuk status HADIR!");
         }
-        // -------------------------------------------
 
+        // --- 2. PENENTUAN TANGGAL ---
         let dateList = [];
         if (statusAbsen === "CUTI") {
             let dStart = new Date(document.getElementById('cuti_mulai').value);
@@ -147,8 +147,8 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
             dateList.push(tglVal);
         }
 
+        // --- 3. PROSES UPLOAD FOTO (HANYA JIKA HADIR) ---
         let allImgUrls = [];
-        // Pastikan upload hanya jalan jika status HADIR (Logika sudah aman)
         if (statusAbsen === "HADIR" && selectedFiles.length > 0) {
             btn.innerText = `Mengunggah ${selectedFiles.length} Foto...`;
             for (let file of selectedFiles) {
@@ -159,15 +159,17 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
             }
         }
 
+        // Jika bukan HADIR, otomatis jadi "N/A"
         const finalImgString = allImgUrls.length > 0 ? allImgUrls.join(", ") : "N/A";
 
+        // --- 4. PENYUSUNAN LAPORAN ---
         const reports = dateList.map(d => ({
             discord_id: discordId,
             nama_anggota: localStorage.getItem("nama_user"),
             pangkat: localStorage.getItem("pangkat"),
             divisi: localStorage.getItem("divisi"),
             tipe_absen: statusAbsen, 
-            jam_duty: (statusAbsen === "HADIR") ? `${document.getElementById('jam_mulai').value} - ${document.getElementById('jam_selesai').value}` : null,
+            jam_duty: (statusAbsen === "HADIR") ? `${document.getElementById('jam_mulai').value} - ${document.getElementById('jam_selesai').value}` : (statusAbsen === "CUTI" ? "CUTI" : "IZIN"),
             alasan: document.getElementById('kegiatan').value,
             bukti_foto: finalImgString, 
             created_at: d.toISOString()
@@ -214,6 +216,7 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
         btn.innerText = "Kirim Laporan";
     }
 });
+
 
 
 // --- FUNGSI PENDUKUNG ---
