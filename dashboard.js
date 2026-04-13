@@ -1,5 +1,5 @@
 /**
- * DASHBOARD.JS - VERSI SINKRONISASI OTOMATIS + ROLE UPDATE
+ * DASHBOARD.JS - VERSI FULL PROTEKSI ADMIN & SINKRONISASI
  */
 
 const _supabase = window.supabase.createClient(
@@ -15,9 +15,8 @@ window.onload = async () => {
     const name = urlParams.get('name');
     const rank = urlParams.get('pangkat');
     const divisi = urlParams.get('divisi');
-    const isAdmin = urlParams.get('admin') === 'true'; // Ambil status admin dari URL
+    const isAdmin = urlParams.get('admin') === 'true'; 
 
-    // Simpan data dari URL jika ada (saat login pertama)
     if (discordId && name) {
         localStorage.setItem("discord_id", discordId);
         localStorage.setItem("nama_user", decodeURIComponent(name));
@@ -25,13 +24,12 @@ window.onload = async () => {
         localStorage.setItem("divisi", decodeURIComponent(divisi || "-"));
         localStorage.setItem("is_admin", isAdmin);
 
-        // UPDATE DATABASE: users_master sekarang mencatat status is_admin
         await _supabase.from('users_master').upsert({
             discord_id: discordId,
             nama_anggota: decodeURIComponent(name),
             pangkat: decodeURIComponent(rank || "Unknown"),
             divisi: decodeURIComponent(divisi || "-"),
-            is_admin: isAdmin // Kolom ini akan terupdate di database setiap user login
+            is_admin: isAdmin 
         }, { onConflict: 'discord_id' });
 
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -45,14 +43,55 @@ window.onload = async () => {
     await updateUI();
     toggleFormMode();
     updateGajiDisplay(); 
+    setupAdminProtection(); // Inisialisasi proteksi tombol rekap
 };
 
-// --- LOGIKA DASHBOARD DATA (SINKRON KE DATABASE) ---
+// --- LOGIKA PROTEKSI ADMIN (REAL-TIME) ---
+function setupAdminProtection() {
+    const adminLink = document.getElementById('admin-link');
+    if (!adminLink) return;
+
+    adminLink.onclick = async (e) => {
+        e.preventDefault();
+        const discId = localStorage.getItem("discord_id");
+        
+        // Simpan teks asli untuk loading state
+        const originalText = adminLink.innerHTML;
+        adminLink.innerHTML = "🔍 Verifikasi Akses...";
+        adminLink.style.pointerEvents = "none";
+
+        try {
+            // Tembak Netlify Function untuk cek role terbaru di Discord
+            const response = await fetch('/.netlify/functions/check-admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ discordId: discId })
+            });
+
+            const result = await response.json();
+
+            if (response.status === 200 && result.isAdmin) {
+                // Jika masih admin, arahkan ke halaman rekap
+                window.location.href = "rekap.html";
+            } else {
+                // Jika role sudah dicabut
+                alert("⚠️ AKSES DITOLAK!\nRole Admin Anda telah dicabut di Discord. Tombol akses akan dihilangkan.");
+                localStorage.setItem("is_admin", "false");
+                adminLink.style.display = 'none';
+            }
+        } catch (err) {
+            alert("Gagal memverifikasi akses. Silakan coba lagi.");
+            adminLink.innerHTML = originalText;
+            adminLink.style.pointerEvents = "auto";
+        }
+    };
+}
+
+// --- LOGIKA DASHBOARD DATA ---
 async function updateUI() {
     const discId = localStorage.getItem("discord_id");
 
     try {
-        // AMBIL DATA TERBARU, termasuk is_admin dari users_master
         const { data: user, error } = await _supabase
             .from('users_master')
             .select('nama_anggota, pangkat, divisi, is_admin')
@@ -60,7 +99,6 @@ async function updateUI() {
             .single();
 
         if (user && !error) {
-            // Update LocalStorage agar sinkron dengan Database
             localStorage.setItem("nama_user", user.nama_anggota);
             localStorage.setItem("pangkat", user.pangkat);
             localStorage.setItem("divisi", user.divisi);
@@ -68,14 +106,11 @@ async function updateUI() {
         }
     } catch (e) { console.warn("Gagal sinkron database, menggunakan cache local."); }
 
-    // Tampilkan ke layar
     document.getElementById('name-display').innerText = localStorage.getItem("nama_user");
     document.getElementById('rank-display').innerText = `${localStorage.getItem("pangkat")} | ${localStorage.getItem("divisi")}`;
     
-    // Tampilkan/Sembunyikan tombol Rekap berdasarkan status admin terbaru
     const adminLink = document.getElementById('admin-link');
     if (adminLink) {
-        // Cek apakah is_admin bernilai true (baik tipe boolean atau string "true")
         const currentAdminStatus = localStorage.getItem("is_admin");
         adminLink.style.display = (currentAdminStatus === "true" || currentAdminStatus === true) ? 'block' : 'none';
     }
@@ -152,6 +187,7 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
             localStorage.setItem("nama_user", result.updatedData.name);
             localStorage.setItem("pangkat", result.updatedData.pangkat);
             localStorage.setItem("divisi", result.updatedData.divisi);
+            localStorage.setItem("is_admin", result.updatedData.isAdmin);
         }
 
         msg.innerText = "✔ Berhasil dikirim & Data Diperbarui!";
@@ -229,8 +265,13 @@ async function updateGajiDisplay() {
         }
         const h = hariHadirUnik.size;
         const totalInput = h + hariIzinUnik.size + hariCutiUnik.size;
-        const hasil = hitungGajiMember(pangkat, h);
-        document.getElementById('gaji-val').innerText = `$${hasil.gajiAkhir.toLocaleString()}`;
+        
+        // Asumsi fungsi hitungGajiMember tersedia secara global di file lain atau dashboard.html
+        if (typeof hitungGajiMember === "function") {
+            const hasil = hitungGajiMember(pangkat, h);
+            document.getElementById('gaji-val').innerText = `$${hasil.gajiAkhir.toLocaleString()}`;
+        }
+        
         document.getElementById('stat-hadir').innerText = h;
         document.getElementById('stat-izin').innerText = hariIzinUnik.size;
         document.getElementById('stat-cuti').innerText = hariCutiUnik.size;
@@ -245,6 +286,7 @@ function toggleFormMode() {
     const singleSec = document.getElementById('single-date-section');
     const rangeSec = document.getElementById('range-date-section');
     const tglInput = document.getElementById('tanggal_absen');
+    
     if (status === "HADIR") {
         singleSec.style.display = "block"; rangeSec.style.display = "none"; hadirSec.style.display = "block";
         tglInput.max = today;
