@@ -355,17 +355,66 @@ function bukaModalPelanggaranUU() {
     });
 
     document.getElementById('uu-total-denda').innerText = "Rp 0";
+    
+    // Tambahkan baris ini untuk mereset teks hukuman di popup
+    const hText = document.getElementById('uu-list-hukuman');
+    if(hText) hText.innerText = "Belum ada sanksi tambahan";
+
     modalUU.style.display = "flex";
+
+    // PENTING: Panggil fungsi uncheck agar radio bisa dibatalkan
+    enableRadioUncheck();
 }
 
 // FUNGSI HITUNG OTOMATIS SAAT DIKLIK
 function hitungUU() {
     const selected = document.querySelectorAll('.cb-uu:checked');
     let total = 0;
+    let listSanksi = [];
+
     selected.forEach(item => {
         total += parseInt(item.dataset.denda || 0);
+        
+        // Ambil data hukuman dari dataset
+        const sanksi = item.dataset.hukuman || item.dataset.sanksi;
+        if (sanksi && sanksi !== "-") {
+            listSanksi.push(sanksi);
+        }
     });
+
+    // Update Angka Denda
     document.getElementById('uu-total-denda').innerText = "Rp " + total.toLocaleString('id-ID');
+
+    // Update Teks Sanksi di Popup
+    const containerSanksi = document.getElementById('uu-list-hukuman');
+    if (containerSanksi) {
+        if (listSanksi.length > 0) {
+            // Set(listSanksi) agar sanksi yang sama tidak muncul dua kali
+            const uniqueSanksi = [...new Set(listSanksi)];
+            containerSanksi.innerText = "Sanksi Tambahan: " + uniqueSanksi.join(", ");
+        } else {
+            containerSanksi.innerText = "Tidak ada sanksi tambahan";
+        }
+    }
+}
+function enableRadioUncheck() {
+    document.querySelectorAll('.cb-uu').forEach(radio => {
+        radio.onclick = function() {
+            if (this.previousValue === 'true') {
+                this.checked = false;
+                this.previousValue = 'false';
+                hitungUU(); // Jalankan hitung ulang setelah batal pilih
+            } else {
+                // Reset flag pada radio lain dalam satu name group
+                document.querySelectorAll(`input[name="${this.name}"]`).forEach(r => {
+                    r.previousValue = 'false';
+                });
+                this.checked = true;
+                this.previousValue = 'true';
+                hitungUU();
+            }
+        };
+    });
 }
 
 async function kirimWarningPelanggaran() {
