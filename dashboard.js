@@ -163,14 +163,27 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
         const finalImgString = allImgUrls.length > 0 ? allImgUrls.join(", ") : "N/A";
 
         // --- 4. PENYUSUNAN LAPORAN ---
+        // --- 4. PENYUSUNAN LAPORAN (VERSI FIX) ---
+
+        // Tentukan nilai jam_duty di luar map agar lebih stabil
+        let jamDutyFix;
+        if (statusAbsen === "HADIR") {
+            const mulai = document.getElementById('jam_mulai').value;
+            const selesai = document.getElementById('jam_selesai').value;
+            jamDutyFix = `${mulai} - ${selesai}`;
+        } else {
+            // Jika status adalah CUTI atau IZIN, gunakan nilainya sebagai teks jam_duty
+            jamDutyFix = statusAbsen; 
+        }
+
         const reports = dateList.map(d => ({
             discord_id: discordId,
             nama_anggota: localStorage.getItem("nama_user"),
             pangkat: localStorage.getItem("pangkat"),
             divisi: localStorage.getItem("divisi"),
             tipe_absen: statusAbsen, 
-            jam_duty: (statusAbsen === "HADIR") ? `${document.getElementById('jam_mulai').value} - ${document.getElementById('jam_selesai').value}` : (statusAbsen === "CUTI" ? "CUTI" : "IZIN"),
-            alasan: document.getElementById('kegiatan').value,
+            jam_duty: jamDutyFix, // Menggunakan variabel yang sudah diproses di atas
+            alasan: document.getElementById('kegiatan').value || "-", // Antisipasi jika alasan kosong
             bukti_foto: finalImgString, 
             created_at: d.toISOString()
         }));
