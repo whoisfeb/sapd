@@ -47,7 +47,8 @@ const DIVISI_MAP = {
 
 // 3. KONFIGURASI ID
 const ANNOUNCEMENT_CHANNEL_ID = "1492812998379700246"; 
-const REQUIRED_ROLE_ID = "1444908462067945623";
+const REQUIRED_ROLE_ID = "1444908462067945623"; // Role Wajib (SAPD)
+const ADMIN_ROLE_ID = "1444909938001580257"; // CONTOH: ID Role Chief (Sesuaikan dengan ID Role Admin/High Command kamu)
 
 client.once('ready', async () => {
     console.log(`Bot berhasil login sebagai ${client.user.tag}`);
@@ -64,8 +65,6 @@ client.once('ready', async () => {
         const members = await guild.members.fetch();
         const dataToUpsert = [];
         const activeDiscordIds = [];
-
-        // Gunakan Promise.all agar update riwayat absensi berjalan paralel (lebih cepat)
         const updateTasks = [];
 
         for (const [id, member] of members) {
@@ -81,7 +80,10 @@ client.once('ready', async () => {
                 const freshName = member.nickname || member.user.globalName || member.user.username;
                 activeDiscordIds.push(member.id);
 
-                // Update RIWAYAT ABSENSI
+                // CEK APAKAH DIA ADMIN (Punya role High Command?)
+                const isUserAdmin = member.roles.cache.has(ADMIN_ROLE_ID);
+
+                // Update RIWAYAT ABSENSI (Agar nama/pangkat di log lama juga update)
                 updateTasks.push(
                     supabase
                         .from('absensi_sapd')
@@ -94,21 +96,22 @@ client.once('ready', async () => {
                 );
 
                 // Siapkan data untuk PROFIL (users_master)
+                // MENYERTAKAN is_admin AGAR TERUPDATE DI SUPABASE
                 dataToUpsert.push({
                     discord_id: member.id,
                     nama_anggota: freshName,
                     pangkat: userPangkat,
                     divisi: userDivisi,
+                    is_admin: isUserAdmin, 
                     last_login: new Date().toISOString()
                 });
             }
         }
 
-        // Jalankan semua update absensi sekaligus
+        // Jalankan semua update riwayat absensi
         await Promise.all(updateTasks);
 
         // PEMBERSIHAN DATABASE: Hapus yang sudah tidak punya Role SAPD
-        // Perbaikan: Hanya hapus jika activeDiscordIds ada isinya untuk menghindari hapus total
         if (activeDiscordIds.length > 0) {
             await supabase
                 .from('users_master')
@@ -116,7 +119,7 @@ client.once('ready', async () => {
                 .not('discord_id', 'in', `(${activeDiscordIds.join(',')})`);
         }
 
-        // Jalankan Upsert ke profil
+        // Jalankan Upsert ke profil (users_master)
         const { error: upsertError } = await supabase
             .from('users_master')
             .upsert(dataToUpsert, { onConflict: 'discord_id' });
@@ -125,15 +128,17 @@ client.once('ready', async () => {
         console.log("Sinkronisasi Profil & Riwayat Berhasil!");
 
         // --- BAGIAN B: BROADCAST PENGUMUMAN (WIB) ---
-        // Perbaikan zona waktu yang lebih akurat
         const formatter = new Intl.DateTimeFormat('id-ID', {
             timeZone: 'Asia/Jakarta',
             hour: 'numeric',
             minute: 'numeric',
             hour12: false
         });
-        const [timeString] = formatter.format(new Date()).split(' ');
-        const [jam, menit] = timeString.split('.').map(Number); // id-ID biasanya pakai titik (19.30)
+        
+        const formattedDate = formatter.format(new Date());
+        const [jamStr, menitStr] = formattedDate.replace('.', ':').split(':');
+        const jam = parseInt(jamStr);
+        const menit = parseInt(menitStr);
 
         console.log(`Waktu saat ini (WIB): ${jam}:${menit}`);
 
@@ -145,7 +150,7 @@ client.once('ready', async () => {
                 await channel.send("📢 **PENGUMUMAN DUTY**\nWAKTUNYA DUTY JIKA BERHALANGAN SILAHKAN IZIN ATAU CUTI DI https://san-andreas-police-departement.netlify.app/\n\n@everyone");
                 console.log("Pesan Duty terkirim.");
             } 
-            // Jam 22:00 - 22:59 WIB
+            // Jam 22:00 WIB
             else if (jam === 22) {
                 await channel.send("📢 **REMINDER ABSENSI**\nJANGAN LUPA UNTUK MENGISI KEHADIRAN DI https://san-andreas-police-departement.netlify.app/\n\n@everyone");
                 console.log("Pesan Absensi terkirim.");
