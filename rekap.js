@@ -1,9 +1,18 @@
 /**
- * REKAP.JS - UPDATED VERSION
- * Integrasi Fitur: Popup Detail, Alasan (log.alasan), Waktu (log.jam_duty), UI Fix
+ * REKAP.JS - FULL VERSION (READABLE)
+ * Perbaikan: Urutan Inisialisasi Supabase & Security
  */
 
-// --- UBAH BAGIAN INI (PALING ATAS) ---
+// --- 1. INISIALISASI SUPABASE (WAJIB DI PALING ATAS) ---
+const _supabase = window.supabase.createClient(
+    "https://urclmvdkfkfwvdascobs.supabase.co", 
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4"
+);
+
+let currentWeekOffset = 0;
+let userWeekly = {}; 
+
+// --- 2. SISTEM KEAMANAN & AUTHENTICATION ---
 async function checkAuth() {
     const discordId = localStorage.getItem("discord_id");
     const isAdminLocal = localStorage.getItem("is_admin");
@@ -36,28 +45,34 @@ function accessDenied() {
     window.location.href = "dashboard.html";
 }
 
-checkAuth(); // Jalankan proteksi
+// Jalankan proteksi segera setelah client supabase siap
+checkAuth();
 
-const _supabase = window.supabase.createClient("https://urclmvdkfkfwvdascobs.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4");
-
-let currentWeekOffset = 0;
-let userWeekly = {}; 
-
+// --- 3. LOGIKA UTAMA: MUAT DATA MINGGUAN ---
 async function loadData() {
     const { mon, sun } = getWeekRange(currentWeekOffset);
     document.getElementById('label-minggu').innerText = `${mon.toLocaleDateString('id-ID')} - ${sun.toLocaleDateString('id-ID')}`;
 
-    const { data: logs } = await _supabase.from('absensi_sapd').select('*').gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
-    const { data: masters } = await _supabase.from('users_master').select('*');
+    const { data: logs } = await _supabase
+        .from('absensi_sapd')
+        .select('*')
+        .gte('created_at', mon.toISOString())
+        .lte('created_at', sun.toISOString());
 
+    const { data: masters } = await _supabase
+        .from('users_master')
+        .select('*');
+
+    // Sorting berdasarkan Pangkat (RANK_ORDER)
     if (typeof RANK_ORDER !== 'undefined' && masters) {
         masters.sort((a, b) => (RANK_ORDER[a.pangkat.toUpperCase()] || 99) - (RANK_ORDER[b.pangkat.toUpperCase()] || 99));
     }
+
     userWeekly = {}; 
     masters.forEach(m => {
         userWeekly[m.discord_id] = { 
             info: m, 
-            days: { 1:null, 2:null, 3:null, 4:null, 5:null, 6:null }, 
+            days: { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null }, 
             totalHadir: 0,
             uniqueDates: new Set() 
         };
@@ -72,12 +87,12 @@ async function loadData() {
             const ketAsli = (log.jam_duty || "").toUpperCase();
             const status = ketAsli.includes("IZIN") ? "IZIN" : (ketAsli.includes("CUTI") ? "CUTI" : "HADIR");
 
-            // FITUR BARU: Mapping detail untuk Popup
+            // Mapping detail untuk Popup
             userWeekly[discordId].days[d] = { 
                 status: status,
                 ket: ketAsli,
-                alasan: log.alasan || "-", // Ambil dari row alasan
-                waktuDuty: log.jam_duty || "-", // Ambil dari jam_duty
+                alasan: log.alasan || "-", 
+                waktuDuty: log.jam_duty || "-", 
                 bukti: log.bukti_foto || log.bukti_gambar,
                 tanggalLog: new Date(log.created_at).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' }),
                 divisi: userWeekly[discordId].info.divisi || "-"
@@ -97,10 +112,9 @@ async function loadData() {
     const currentAdminRank = localStorage.getItem("pangkat");
 
     document.getElementById('tbody-weekly').innerHTML = masters.map(m => {
-        // --- BAGIAN YANG DIUBAH ---
         const u = userWeekly[m.discord_id];
 
-        // Kita tambahkan pengecekan 'typeof' agar tidak error jika fungsi tidak ditemukan
+        // Hitung Gaji (Jika fungsi tersedia)
         const hasilGaji = typeof hitungGajiMember === 'function' 
             ? hitungGajiMember(m.pangkat, u.totalHadir) 
             : { gajiAkhir: 0 };
@@ -119,7 +133,7 @@ async function loadData() {
             if (data.status === "IZIN") { label = "I"; iconClass = "status-ic"; }
             if (data.status === "CUTI") { label = "C"; iconClass = "status-ic"; }
 
-            // FITUR BARU: Klik icon untuk buka popup detail
+            // Ubah data objek menjadi string untuk parameter onclick
             const dataStr = JSON.stringify(data).replace(/"/g, '&quot;');
             return `<span class="${iconClass}" style="cursor:pointer;" onclick="openDetailPopup('${m.nama_anggota}', '${m.pangkat}', ${dataStr})">${label}</span>`;
         };
@@ -143,8 +157,7 @@ async function loadData() {
     document.getElementById('total-gaji-global').innerText = `$${totalGajiSemua.toLocaleString()}`;
 }
 
-// --- FITUR BARU: POPUP DETAIL DENGAN FIX LAYOUT ---
-// --- FITUR BARU: POPUP DETAIL DENGAN FIX LAYOUT & MULTI-IMAGE ---
+// --- 4. FITUR POPUP DETAIL (FIX LAYOUT & MULTI-IMAGE) ---
 function openDetailPopup(nama, pangkat, data) {
     const modal = document.getElementById('modal-detail');
     const content = document.getElementById('detail-content');
@@ -223,8 +236,7 @@ window.onclick = function(event) {
     if (event.target == modal) closeDetailPopup();
 }
 
-// --- FITUR WARNING & LAINNYA (TIDAK BERUBAH) ---
-
+// --- 5. FITUR WARNING & DISCORD INTEGRATION ---
 async function sendWarning(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank) {
     if (!confirm(`Kirim SP-${currentWarn + 1} ke Discord?\n(Oleh: ${adminName} - ${adminRank})`)) return;
     
@@ -232,9 +244,11 @@ async function sendWarning(discord_id, nama_anggota, pangkat_anggota, currentWar
     const u = userWeekly[discord_id];
     const daftarBolos = [];
     const hari = ["", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    
     for(let i=1; i<=6; i++) { 
         if(!u.days[i]) { 
-            const t=new Date(mon); t.setDate(mon.getDate()+(i-1)); 
+            const t=new Date(mon); 
+            t.setDate(mon.getDate()+(i-1)); 
             daftarBolos.push(`- ${hari[i]}, ${t.toLocaleDateString('id-ID')}`); 
         } 
     }
@@ -251,11 +265,16 @@ async function sendWarning(discord_id, nama_anggota, pangkat_anggota, currentWar
     };
 
     await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
+    
     const res = await fetch('/.netlify/functions/send-warning', { 
         method: 'POST', 
         body: JSON.stringify({ payload: logPayload, updateList: await updateDiscordList() }) 
     });
-    if (res.ok) { alert("SP Terkirim!"); loadData(); }
+
+    if (res.ok) { 
+        alert("SP Terkirim!"); 
+        loadData(); 
+    }
 }
 
 async function removeWarning(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank) {
@@ -273,16 +292,24 @@ async function removeWarning(discord_id, nama_anggota, pangkat_anggota, currentW
     };
 
     await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
+    
     const res = await fetch('/.netlify/functions/send-warning', { 
         method: 'POST', 
         body: JSON.stringify({ payload: logPayload, updateList: await updateDiscordList() }) 
     });
-    if (res.ok) { alert("SP Berhasil dicabut!"); loadData(); }
+
+    if (res.ok) { 
+        alert("SP Berhasil dicabut!"); 
+        loadData(); 
+    }
 }
 
 async function updateDiscordList() {
     const { data: masters } = await _supabase.from('users_master').select('*');
-    masters.sort((a, b) => (RANK_ORDER[a.pangkat.toUpperCase()] || 99) - (RANK_ORDER[b.pangkat.toUpperCase()] || 99));
+    if (typeof RANK_ORDER !== 'undefined') {
+        masters.sort((a, b) => (RANK_ORDER[a.pangkat.toUpperCase()] || 99) - (RANK_ORDER[b.pangkat.toUpperCase()] || 99));
+    }
+    
     let txt = "## 📊 DAFTAR TOTAL WARNING ANGGOTA SAPD\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
     masters.forEach(m => {
         const emoji = m.total_warning >= 3 ? "🔴" : (m.total_warning > 0 ? "🟡" : "🟢");
@@ -291,6 +318,7 @@ async function updateDiscordList() {
     return txt.substring(0, 1990);
 }
 
+// --- 6. EXPORT TOOLS (EXCEL & PDF) ---
 function downloadExcel() {
     const rows = [["Nama Anggota", "Pangkat", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Total", "Gaji"]];
     document.querySelectorAll("#tbody-weekly tr").forEach(tr => {
@@ -332,11 +360,17 @@ function downloadPDF() {
     doc.save(`Rekap_SAPD.pdf`);
 }
 
+// --- 7. UTILS & DATA MANAGEMENT ---
 function getWeekRange(offset = 0) {
-    const now = new Date(); now.setDate(now.getDate() + (offset * 7));
-    const day = now.getDay(); const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-    const mon = new Date(now.setDate(diff)); mon.setHours(0,0,0,0);
-    const sun = new Date(mon); sun.setDate(mon.getDate() + 6); sun.setHours(23,59,59,999);
+    const now = new Date(); 
+    now.setDate(now.getDate() + (offset * 7));
+    const day = now.getDay(); 
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    const mon = new Date(now.setDate(diff)); 
+    mon.setHours(0,0,0,0);
+    const sun = new Date(mon); 
+    sun.setDate(mon.getDate() + 6); 
+    sun.setHours(23,59,59,999);
     return { mon, sun };
 }
 
@@ -344,39 +378,29 @@ async function resetUser(id) {
     if (!confirm("Hapus data absensi & bukti gambar anggota ini di minggu ini?")) return;
     const { mon, sun } = getWeekRange(currentWeekOffset);
     
-    // 1. Ambil data log untuk mendapatkan URL gambar
     const { data: logs } = await _supabase.from('absensi_sapd')
-        .select('bukti_foto') // Pastikan nama kolom sesuai (bukti_foto atau bukti_gambar)
+        .select('bukti_foto') 
         .eq('discord_id', id)
         .gte('created_at', mon.toISOString())
         .lte('created_at', sun.toISOString());
 
     if (logs && logs.length > 0) {
         let filesToRemove = [];
-        
         logs.forEach(log => {
             if (log.bukti_foto && log.bukti_foto !== "N/A") {
-                // Pecah string jika ada banyak gambar (koma), lalu ambil nama filenya saja
                 const urls = log.bukti_foto.split(', ');
                 urls.forEach(url => {
-                    // Mengambil bagian setelah '/absensi/' untuk mendapatkan nama filenya
                     const fileName = url.split('/absensi/')[1];
                     if (fileName) filesToRemove.push(`absensi/${fileName}`);
                 });
             }
         });
 
-        // 2. Hapus dari Storage jika ada file
         if (filesToRemove.length > 0) {
-            const { error: storageError } = await _supabase.storage
-                .from('bukti-absen')
-                .remove(filesToRemove);
-            
-            if(storageError) console.error("Gagal hapus gambar di storage:", storageError);
+            await _supabase.storage.from('bukti-absen').remove(filesToRemove);
         }
     }
 
-    // 3. Hapus data dari Database
     await _supabase.from('absensi_sapd')
         .delete()
         .eq('discord_id', id)
@@ -391,7 +415,6 @@ async function resetAllWeeklyData() {
     if (!confirm("Hapus SEMUA data absensi & bukti gambar minggu ini?")) return;
     const { mon, sun } = getWeekRange(currentWeekOffset);
 
-    // 1. Ambil semua log minggu ini
     const { data: allLogs } = await _supabase.from('absensi_sapd')
         .select('bukti_foto')
         .gte('created_at', mon.toISOString())
@@ -408,13 +431,11 @@ async function resetAllWeeklyData() {
                 });
             }
         });
-
         if (filesToRemove.length > 0) {
             await _supabase.storage.from('bukti-absen').remove(filesToRemove);
         }
     }
 
-    // 2. Hapus dari Database
     await _supabase.from('absensi_sapd')
         .delete()
         .gte('created_at', mon.toISOString())
@@ -424,5 +445,7 @@ async function resetAllWeeklyData() {
     loadData();
 }
 
-function changeWeek(dir) { currentWeekOffset += dir; loadData(); }
-loadData();
+function changeWeek(dir) { 
+    currentWeekOffset += dir; 
+    loadData(); 
+}
