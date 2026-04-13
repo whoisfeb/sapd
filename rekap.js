@@ -270,7 +270,13 @@ function openDetailPopup(nama, pangkat, data) {
             <div class="pop-row"><div class="pop-label">Waktu</div><div class="pop-colon">:</div><div class="pop-val">${data.waktuDuty}</div></div>
             <div class="pop-row">
                 <div class="pop-label">Status</div><div class="pop-colon">:</div>
-                <div class="pop-val"><span style="background:#00adb5; color:#000; padding:2px 8px; border-radius:4px; font-weight:bold; font-size:11px;">${data.status}</span></div>
+                // Ganti data.status menjadi data.tipe_absen
+                <div class="pop-val">
+                    <span style="background:#00adb5; color:#000; padding:2px 8px; border-radius:4px; font-weight:bold; font-size:11px;">
+                        ${data.tipe_absen || data.status}
+                    </span>
+                </div>
+
             </div>
             <div class="pop-row" style="border-bottom:none;">
                 <div class="pop-label">Alasan</div><div class="pop-colon">:</div>
