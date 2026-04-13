@@ -272,16 +272,15 @@ async function sendWarning() {
 // FUNGSI BARU: Buka Modal UU
 function bukaModalPelanggaranUU() {
     const modalUU = document.getElementById('modal-pelanggaran-uu');
-    if (!modalUU) return alert("Modal Pelanggaran (modal-pelanggaran-uu) belum ada di HTML.");
+    if (!modalUU) return alert("Modal Pelanggaran belum ada di HTML.");
 
-    // Set Info Otomatis
     document.getElementById('uu-nama').innerText = tempWarningData.nama_anggota;
     document.getElementById('uu-pangkat').innerText = tempWarningData.pangkat_anggota;
     document.getElementById('uu-divisi').innerText = userWeekly[tempWarningData.discord_id].info.divisi || "-";
 
-    // Parsing uu.js (kodeHTML)
     const container = document.getElementById('uu-list-container');
     container.innerHTML = "";
+    
     const parser = new DOMParser();
     const doc = parser.parseFromString(kodeHTML, 'text/html');
     const sections = doc.querySelectorAll('section');
@@ -289,18 +288,36 @@ function bukaModalPelanggaranUU() {
     sections.forEach(sec => {
         const title = sec.querySelector('.bab-title').innerText;
         const pasals = sec.querySelectorAll('.pasal');
+        
         pasals.forEach(pas => {
             const label = pas.querySelector('.pasal-label').innerText;
-            const penalty = pas.querySelector('.penalty-box').innerText;
-            const dendaMatch = penalty.match(/Denda Rp ([\d.]+)/);
-            const dendaVal = dendaMatch ? parseInt(dendaMatch[1].replace(/\./g, '')) : 0;
+            const penaltyText = pas.querySelector('.penalty-box').innerHTML; // Pakai innerHTML agar <br> terbaca
+
+            // Ambil angka denda menggunakan regex
+            const matchMin = penaltyText.match(/MIN: Denda Rp ([\d.]+)/);
+            const matchMax = penaltyText.match(/MAX: Denda Rp ([\d.]+)/);
+            
+            const dendaMin = matchMin ? parseInt(matchMin[1].replace(/\./g, '')) : 0;
+            const dendaMax = matchMax ? parseInt(matchMax[1].replace(/\./g, '')) : 0;
 
             const div = document.createElement('div');
-            div.style.marginBottom = "8px";
+            div.style.cssText = "margin-bottom: 15px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px;";
             div.innerHTML = `
-                <input type="checkbox" class="cb-uu" data-denda="${dendaVal}" data-label="${label}" onchange="hitungUU()">
-                <label style="color:#00adb5; font-size:12px; margin-left:5px;"><b>${label}</b> (${title})</label>
-                <div style="font-size:10px; color:#888; margin-left:22px;">${penalty}</div>
+                <div style="color:#00adb5; font-weight:bold; margin-bottom:5px;">${label}</div>
+                <div style="font-size:11px; color:#888; margin-bottom:8px; line-height:1.2;">${penaltyText}</div>
+                
+                <div style="display:flex; gap:15px; font-size:12px;">
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px;">
+                        <input type="radio" name="select_${label.replace(/\s/g,'')}" class="cb-uu" 
+                            data-denda="${dendaMin}" data-label="${label} (MIN)" onchange="hitungUU()"> 
+                        🔴 MIN (Rp ${dendaMin.toLocaleString()})
+                    </label>
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px;">
+                        <input type="radio" name="select_${label.replace(/\s/g,'')}" class="cb-uu" 
+                            data-denda="${dendaMax}" data-label="${label} (MAX)" onchange="hitungUU()"> 
+                        🔥 MAX (Rp ${dendaMax.toLocaleString()})
+                    </label>
+                </div>
             `;
             container.appendChild(div);
         });
