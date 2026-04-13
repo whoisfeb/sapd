@@ -48,7 +48,7 @@ const DIVISI_MAP = {
 // 3. KONFIGURASI ID
 const ANNOUNCEMENT_CHANNEL_ID = "1492812998379700246"; 
 const REQUIRED_ROLE_ID = "1444908462067945623"; // Role Wajib (SAPD)
-const ADMIN_ROLE_ID = "1444909938001580257"; // CONTOH: ID Role Chief (Sesuaikan dengan ID Role Admin/High Command kamu)
+const ADMIN_ROLE_ID = "1444910578266148897"; // CONTOH: ID Role Chief (Sesuaikan dengan ID Role Admin/High Command kamu)
 
 client.once('ready', async () => {
     console.log(`Bot berhasil login sebagai ${client.user.tag}`);
