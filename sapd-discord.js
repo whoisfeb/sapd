@@ -12,7 +12,6 @@ const client = new Client({
 // --- KONFIGURASI (MENGGUNAKAN SECRETS GITHUB) ---
 const TOKEN = process.env.DISCORD_BOT_TOKEN; 
 const PROMOTION_CHANNEL_ID = process.env.DISCORD_PROMOTION_CHANNEL_ID || '1444904948692422756';
-// GANTI ID DI BAWAH INI DENGAN ID CHANNEL NOTIF KAMU
 const NOTIF_CHANNEL_ID = '1493137414175326249'; 
 
 // 1. Mapping ID Role ke Singkatan Nickname
@@ -78,14 +77,13 @@ const allGroupIDs = [
     '1444910648516415488', // COMMAND TEAM
     '1444910578266148897' // HIGH COMMAND     
 ];
-
 // NOTIFIKASI AKTIF (TANPA HAPUS OTOMATIS)
 client.once('ready', () => {
     console.log(`Bot login sebagai ${client.user.tag}`);
     
     const notifChannel = client.channels.cache.get(NOTIF_CHANNEL_ID);
     if (notifChannel) {
-        notifChannel.send(`✅ **Sistem SAPD Online** | ${new Date().toLocaleString('id-ID')} | Status: Menunggu Promosi... \n\n*Bot ini akan otomatis memproses promosi berdasarkan format yang ditentukan di channel promosi.*\n*Pastikan format promosi benar agar bot dapat memproses dengan lancar.*\n*Ketika tidak ada aktifitas yang sesuai format di channel <#1444904948692422756> maka bot akan offline*\n @everyone`)
+        notifChannel.send(`✅ **Sistem SAPD Online** | ${new Date().toLocaleString('id-ID')} | Status: Menunggu Promosi/Demotion... \n\n*Bot ini akan otomatis memproses promosi/demotion berdasarkan format yang ditentukan di channel promosi.*\n*Pastikan format benar agar bot dapat memproses dengan lancar.*\n*Ketika tidak ada aktivitas yang sesuai format di channel <#1444904948692422756> maka bot akan offline.*\n@everyone`)
         .catch(console.error);
     }
 });
@@ -93,14 +91,22 @@ client.once('ready', () => {
 client.on('messageCreate', async (message) => {
     if (message.author.bot || message.channel.id !== PROMOTION_CHANNEL_ID) return;
 
-    if (message.content.includes('**PROMOTION**')) {
+    const isPromotion = message.content.includes('**PROMOTION**');
+    const isDemotion = message.content.includes('**DEMOTION**');
+
+    if (isPromotion || isDemotion) {
         const nameLine = message.content.match(/Name:\s*(.*)/i);
         const userMatches = nameLine ? nameLine[1].match(/<@!?(\d+)>/g) : null;
         const prevRankMatch = message.content.match(/Previous Rank:\s*<@&(\d+)>/i);
-        const newRankMatch = message.content.match(/Rank to be promoted:\s*<@&(\d+)>/i);
+        
+        // Regex fleksibel untuk menangkap Rank baru baik di Promotion maupun Demotion
+        const newRankMatch = message.content.match(/Rank to be (?:promoted|demoted):\s*<@&(\d+)>/i);
+        
         const prevDivLine = message.content.match(/Previous Division\s*:\s*(.*)/i);
         const prevDivs = prevDivLine ? prevDivLine[1].match(/<@&(\d+)>/g) : null;
-        const newDivLine = message.content.match(/Moved to this\s+division\s*:?\s*(.*)/i);
+        
+        // Regex fleksibel untuk menangkap pindah divisi
+        const newDivLine = message.content.match(/(?:Moved to this division|Moved to this\s+division)\s*:?\s*(.*)/i);
         const newDivs = newDivLine ? newDivLine[1].match(/<@&(\d+)>/g) : null;
 
         if (!userMatches) return;
@@ -115,9 +121,11 @@ client.on('messageCreate', async (message) => {
 
                 const newRankID = newRankMatch ? newRankMatch[1] : null;
 
+                // Update Rank (Hapus lama, Tambah baru)
                 if (prevRankMatch) await member.roles.remove(prevRankMatch[1]).catch(() => null);
                 if (newRankID) await member.roles.add(newRankID).catch(console.error);
 
+                // Update Divisi
                 if (prevDivs) {
                     for (const div of prevDivs) await member.roles.remove(div.replace(/[<@&>]/g, '')).catch(() => null);
                 }
@@ -125,6 +133,7 @@ client.on('messageCreate', async (message) => {
                     for (const div of newDivs) await member.roles.add(div.replace(/[<@&>]/g, '')).catch(console.error);
                 }
 
+                // Update Role Kelompok (Police Officer, Detective, dll)
                 if (newRankID && groupRoles[newRankID]) {
                     const targetGroupID = groupRoles[newRankID];
                     for (const groupID of allGroupIDs) {
@@ -135,6 +144,7 @@ client.on('messageCreate', async (message) => {
                     await member.roles.add(targetGroupID).catch(console.error);
                 }
 
+                // Update Nickname berdasarkan Prefix Rank Baru
                 if (newRankID && rankPrefixes[newRankID]) {
                     const prefix = rankPrefixes[newRankID];
                     let cleanName = member.displayName;
@@ -142,7 +152,7 @@ client.on('messageCreate', async (message) => {
                     const newNickname = `${prefix} | ${cleanName}`.substring(0, 32);
                     await member.setNickname(newNickname).catch(() => null);
                 }
-                console.log(`Berhasil: ${member.user.tag} diproses.`);
+                console.log(`Berhasil: ${member.user.tag} (${isPromotion ? 'Promotion' : 'Demotion'}) diproses.`);
             } catch (error) {
                 console.error(`Kesalahan pada ID ${userID}:`, error);
             }
