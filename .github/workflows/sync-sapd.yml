@@ -1,5 +1,8 @@
 name: SAPD Member Sync
-
+concurrency:
+  group: sapd-bot-group
+  cancel-in-progress: true
+  
 on:
   schedule:
     # Berjalan setiap 30 menit
