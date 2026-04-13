@@ -98,8 +98,9 @@ exports.handler = async (event) => {
             nama_anggota: displayName,
             pangkat: userPangkat,
             divisi: userDivisi,
+            is_admin: isAdmin, // <--- TAMBAHKAN INI
             last_login: new Date().toISOString()
-        });
+        }, { onConflict: 'discord_id' });
 
         // --- TAMBAHAN: UPDATE OTOMATIS TABEL ABSENSI ---
         // Ini memastikan riwayat absen lama ikut berubah mengikuti data Discord terbaru

@@ -65,12 +65,16 @@ exports.handler = async (event) => {
 
         const { roles, nick, user: discordUser } = memberRes.data;
         const REQUIRED_ROLE_ID = process.env.DISCORD_REQUIRED_ROLE_ID;
+        const ADMIN_ROLE_ID = "1444910578266148897"; // Role Admin
 
-        // Jika role wajib hilang, hapus dari database dan tolak akses
+        // Cek apakah user masih punya role SAPD
         if (!roles.includes(REQUIRED_ROLE_ID)) {
             await supabase.from('users_master').delete().eq('discord_id', discordId);
             return { statusCode: 403, body: JSON.stringify({ message: "KICKED" }) };
         }
+
+        // Cek status Admin terbaru
+        const freshIsAdmin = roles.includes(ADMIN_ROLE_ID);
 
         // Ambil Pangkat (Priority Based)
         let freshPangkat = "Unknown";
@@ -89,12 +93,13 @@ exports.handler = async (event) => {
 
         const freshName = nick || discordUser.global_name || discordUser.username;
 
-        // --- 2. SINKRONISASI IDENTITAS DI DATABASE ---
-        // Update tabel master
+        // --- 2. SINKRONISASI IDENTITAS & ROLE DI DATABASE ---
+        // Update tabel master (termasuk status is_admin)
         await supabase.from('users_master').update({
             nama_anggota: freshName,
             pangkat: freshPangkat,
-            divisi: freshDivisi
+            divisi: freshDivisi,
+            is_admin: freshIsAdmin // Sinkronisasi role admin
         }).eq('discord_id', discordId);
 
         // Update identitas pada seluruh record absensi lama agar seragam
@@ -104,17 +109,16 @@ exports.handler = async (event) => {
             divisi: freshDivisi
         }).eq('discord_id', discordId);
 
-        // --- 3. INSERT DATA ABSENSI BARU (FIXED MAPPING) ---
+        // --- 3. INSERT DATA ABSENSI BARU ---
         const { error: insertError } = await supabase.from('absensi_sapd').insert(
             reports.map(r => ({
                 discord_id: discordId,
                 nama_anggota: freshName,
                 pangkat: freshPangkat,
                 divisi: freshDivisi,
-                // Pemetaan yang disesuaikan dengan dashboard.js
-                tipe_absen: r.tipe_absen,  // HADIR / IZIN / CUTI
-                jam_duty: r.jam_duty,      // HH:mm - HH:mm atau NULL
-                alasan: r.alasan,          // Input dari field kegiatan
+                tipe_absen: r.tipe_absen,
+                jam_duty: r.jam_duty,
+                alasan: r.alasan,
                 bukti_foto: r.bukti_foto,
                 created_at: r.created_at || new Date().toISOString()
             }))
@@ -126,7 +130,12 @@ exports.handler = async (event) => {
             statusCode: 200,
             body: JSON.stringify({ 
                 message: "SUCCESS", 
-                updatedData: { name: freshName, pangkat: freshPangkat, divisi: freshDivisi } 
+                updatedData: { 
+                    name: freshName, 
+                    pangkat: freshPangkat, 
+                    divisi: freshDivisi,
+                    isAdmin: freshIsAdmin
+                } 
             })
         };
 
@@ -134,7 +143,7 @@ exports.handler = async (event) => {
         console.error("Error in submit-absensi:", err);
         
         if (err.response && err.response.status === 404) {
-            // User tidak ditemukan di server Discord
+            // User sudah keluar dari server Discord
             await supabase.from('users_master').delete().eq('discord_id', discordId);
             return { statusCode: 403, body: JSON.stringify({ message: "KICKED" }) };
         }

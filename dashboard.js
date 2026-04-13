@@ -1,5 +1,5 @@
 /**
- * DASHBOARD.JS - VERSI SINKRONISASI OTOMATIS
+ * DASHBOARD.JS - VERSI SINKRONISASI OTOMATIS + ROLE UPDATE
  */
 
 const _supabase = window.supabase.createClient(
@@ -15,7 +15,7 @@ window.onload = async () => {
     const name = urlParams.get('name');
     const rank = urlParams.get('pangkat');
     const divisi = urlParams.get('divisi');
-    const isAdmin = urlParams.get('admin') === 'true';
+    const isAdmin = urlParams.get('admin') === 'true'; // Ambil status admin dari URL
 
     // Simpan data dari URL jika ada (saat login pertama)
     if (discordId && name) {
@@ -25,11 +25,13 @@ window.onload = async () => {
         localStorage.setItem("divisi", decodeURIComponent(divisi || "-"));
         localStorage.setItem("is_admin", isAdmin);
 
+        // UPDATE DATABASE: users_master sekarang mencatat status is_admin
         await _supabase.from('users_master').upsert({
             discord_id: discordId,
             nama_anggota: decodeURIComponent(name),
             pangkat: decodeURIComponent(rank || "Unknown"),
-            divisi: decodeURIComponent(divisi || "-")
+            divisi: decodeURIComponent(divisi || "-"),
+            is_admin: isAdmin // Kolom ini akan terupdate di database setiap user login
         }, { onConflict: 'discord_id' });
 
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -40,7 +42,6 @@ window.onload = async () => {
         return;
     }
 
-    // Jalankan update tampilan (sekarang memanggil database)
     await updateUI();
     toggleFormMode();
     updateGajiDisplay(); 
@@ -51,10 +52,10 @@ async function updateUI() {
     const discId = localStorage.getItem("discord_id");
 
     try {
-        // AMBIL DATA TERBARU DARI DATABASE users_master
+        // AMBIL DATA TERBARU, termasuk is_admin dari users_master
         const { data: user, error } = await _supabase
             .from('users_master')
-            .select('nama_anggota, pangkat, divisi')
+            .select('nama_anggota, pangkat, divisi, is_admin')
             .eq('discord_id', discId)
             .single();
 
@@ -63,6 +64,7 @@ async function updateUI() {
             localStorage.setItem("nama_user", user.nama_anggota);
             localStorage.setItem("pangkat", user.pangkat);
             localStorage.setItem("divisi", user.divisi);
+            localStorage.setItem("is_admin", user.is_admin);
         }
     } catch (e) { console.warn("Gagal sinkron database, menggunakan cache local."); }
 
@@ -70,9 +72,12 @@ async function updateUI() {
     document.getElementById('name-display').innerText = localStorage.getItem("nama_user");
     document.getElementById('rank-display').innerText = `${localStorage.getItem("pangkat")} | ${localStorage.getItem("divisi")}`;
     
-    if (localStorage.getItem("is_admin") === "true") {
-        const adminLink = document.getElementById('admin-link');
-        if(adminLink) adminLink.style.display = 'block';
+    // Tampilkan/Sembunyikan tombol Rekap berdasarkan status admin terbaru
+    const adminLink = document.getElementById('admin-link');
+    if (adminLink) {
+        // Cek apakah is_admin bernilai true (baik tipe boolean atau string "true")
+        const currentAdminStatus = localStorage.getItem("is_admin");
+        adminLink.style.display = (currentAdminStatus === "true" || currentAdminStatus === true) ? 'block' : 'none';
     }
 }
 
@@ -101,7 +106,6 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
             dateList.push(tglVal);
         }
 
-        // UNGGAH BANYAK GAMBAR
         let allImgUrls = [];
         if (statusAbsen === "HADIR" && selectedFiles.length > 0) {
             btn.innerText = `Mengunggah ${selectedFiles.length} Foto...`;
@@ -144,7 +148,6 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
 
         if (response.status !== 200) throw new Error("Gagal mengirim.");
 
-        // JIKA BERHASIL, UPDATE LOCALSTORAGE DENGAN DATA TERBARU DARI SERVER
         if (result.updatedData) {
             localStorage.setItem("nama_user", result.updatedData.name);
             localStorage.setItem("pangkat", result.updatedData.pangkat);
@@ -157,7 +160,7 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
         document.getElementById('absensi-form').reset();
         selectedFiles = [];
         renderPreview();
-        await updateUI(); // Update tampilan layar
+        await updateUI(); 
         updateGajiDisplay();
 
     } catch (err) {
@@ -169,7 +172,7 @@ document.getElementById('absensi-form').addEventListener('submit', async (e) => 
     }
 });
 
-// --- SISA FUNGSI LAINNYA (Preview, Gaji, dll tetap sama) ---
+// --- FUNGSI PENDUKUNG ---
 function renderPreview() {
     const gallery = document.getElementById('preview-gallery');
     gallery.innerHTML = "";

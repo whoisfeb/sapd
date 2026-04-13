@@ -3,16 +3,40 @@
  * Integrasi Fitur: Popup Detail, Alasan (log.alasan), Waktu (log.jam_duty), UI Fix
  */
 
-function checkAuth() {
-    const isAdmin = localStorage.getItem("is_admin");
-    if (isAdmin !== "true") {
-        alert("AKSES DITOLAK: Halaman ini hanya untuk High Command (Admin).");
-        window.location.href = "dashboard.html";
+// --- UBAH BAGIAN INI (PALING ATAS) ---
+async function checkAuth() {
+    const discordId = localStorage.getItem("discord_id");
+    const isAdminLocal = localStorage.getItem("is_admin");
+
+    // Jika di browser tidak ada data admin, langsung lempar ke dashboard
+    if (!discordId || isAdminLocal !== "true") {
+        return accessDenied();
+    }
+
+    // CEK VALIDASI KE DATABASE SUPABASE
+    const { data: user, error } = await _supabase
+        .from('users_master')
+        .select('is_admin')
+        .eq('discord_id', discordId)
+        .single();
+
+    // Jika di database status adminnya sudah dicabut/salah, kunci aksesnya
+    if (error || !user || user.is_admin !== true) {
+        localStorage.setItem("is_admin", "false"); 
+        return accessDenied();
     } else {
+        // Jika benar admin, baru tampilkan halaman dan muat data
         document.body.style.display = "block";
+        loadData(); 
     }
 }
-checkAuth();
+
+function accessDenied() {
+    alert("AKSES DITOLAK: Halaman ini hanya untuk High Command (Admin).");
+    window.location.href = "dashboard.html";
+}
+
+checkAuth(); // Jalankan proteksi
 
 const _supabase = window.supabase.createClient("https://urclmvdkfkfwvdascobs.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyY2xtdmRrZmtmd3ZkYXNjb2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDkzMjQsImV4cCI6MjA5MTM4NTMyNH0.FE8ynCm5Pfg861wpG1rslSCLSNUnXSwyEIVbHiqajT4");
 
@@ -26,8 +50,9 @@ async function loadData() {
     const { data: logs } = await _supabase.from('absensi_sapd').select('*').gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
     const { data: masters } = await _supabase.from('users_master').select('*');
 
-    masters.sort((a, b) => (RANK_ORDER[a.pangkat.toUpperCase()] || 99) - (RANK_ORDER[b.pangkat.toUpperCase()] || 99));
-
+    if (typeof RANK_ORDER !== 'undefined' && masters) {
+        masters.sort((a, b) => (RANK_ORDER[a.pangkat.toUpperCase()] || 99) - (RANK_ORDER[b.pangkat.toUpperCase()] || 99));
+    }
     userWeekly = {}; 
     masters.forEach(m => {
         userWeekly[m.discord_id] = { 
@@ -72,8 +97,14 @@ async function loadData() {
     const currentAdminRank = localStorage.getItem("pangkat");
 
     document.getElementById('tbody-weekly').innerHTML = masters.map(m => {
+        // --- BAGIAN YANG DIUBAH ---
         const u = userWeekly[m.discord_id];
-        const hasilGaji = hitungGajiMember(m.pangkat, u.totalHadir);
+
+        // Kita tambahkan pengecekan 'typeof' agar tidak error jika fungsi tidak ditemukan
+        const hasilGaji = typeof hitungGajiMember === 'function' 
+            ? hitungGajiMember(m.pangkat, u.totalHadir) 
+            : { gajiAkhir: 0 };
+
         const totalGaji = hasilGaji.gajiAkhir;
         totalGajiSemua += totalGaji;
 

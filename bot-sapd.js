@@ -49,7 +49,6 @@ const DIVISI_MAP = {
 const ANNOUNCEMENT_CHANNEL_ID = "1492812998379700246"; 
 const REQUIRED_ROLE_ID = "1444908462067945623";
 
-// 4. LOGIKA UTAMAsa
 client.once('ready', async () => {
     console.log(`Bot berhasil login sebagai ${client.user.tag}`);
     
@@ -66,13 +65,14 @@ client.once('ready', async () => {
         const dataToUpsert = [];
         const activeDiscordIds = [];
 
+        // Gunakan Promise.all agar update riwayat absensi berjalan paralel (lebih cepat)
+        const updateTasks = [];
+
         for (const [id, member] of members) {
-            // Hanya proses yang punya Role SAPD
             if (member.roles.cache.has(REQUIRED_ROLE_ID)) {
                 let userPangkat = "-";
                 let userDivisi = "-";
 
-                // Cek Role untuk Pangkat & Divisi
                 member.roles.cache.forEach(role => {
                     if (PANGKAT_MAP[role.id]) userPangkat = PANGKAT_MAP[role.id];
                     if (DIVISI_MAP[role.id]) userDivisi = DIVISI_MAP[role.id];
@@ -81,16 +81,17 @@ client.once('ready', async () => {
                 const freshName = member.nickname || member.user.globalName || member.user.username;
                 activeDiscordIds.push(member.id);
 
-                // Update RIWAYAT ABSENSI (Agar logs lama ikut berubah pangkatnya)
-                // Ini mengupdate semua baris yang punya discord_id tersebut
-                await supabase
-                    .from('absensi_sapd')
-                    .update({
-                        nama_anggota: freshName,
-                        pangkat: userPangkat,
-                        divisi: userDivisi
-                    })
-                    .eq('discord_id', member.id);
+                // Update RIWAYAT ABSENSI
+                updateTasks.push(
+                    supabase
+                        .from('absensi_sapd')
+                        .update({
+                            nama_anggota: freshName,
+                            pangkat: userPangkat,
+                            divisi: userDivisi
+                        })
+                        .eq('discord_id', member.id)
+                );
 
                 // Siapkan data untuk PROFIL (users_master)
                 dataToUpsert.push({
@@ -103,7 +104,11 @@ client.once('ready', async () => {
             }
         }
 
-        // Hapus member yang sudah tidak ada di Discord/Role dicabut (Pembersihan Database)
+        // Jalankan semua update absensi sekaligus
+        await Promise.all(updateTasks);
+
+        // PEMBERSIHAN DATABASE: Hapus yang sudah tidak punya Role SAPD
+        // Perbaikan: Hanya hapus jika activeDiscordIds ada isinya untuk menghindari hapus total
         if (activeDiscordIds.length > 0) {
             await supabase
                 .from('users_master')
@@ -111,7 +116,7 @@ client.once('ready', async () => {
                 .not('discord_id', 'in', `(${activeDiscordIds.join(',')})`);
         }
 
-        // Jalankan Upsert ke profil (Update jika ada, Tambah jika baru)
+        // Jalankan Upsert ke profil
         const { error: upsertError } = await supabase
             .from('users_master')
             .upsert(dataToUpsert, { onConflict: 'discord_id' });
@@ -120,24 +125,29 @@ client.once('ready', async () => {
         console.log("Sinkronisasi Profil & Riwayat Berhasil!");
 
         // --- BAGIAN B: BROADCAST PENGUMUMAN (WIB) ---
-        const sekarang = new Date();
-        const waktuWIB = new Date(sekarang.getTime() + (7 * 60 * 60 * 1000));
-        const jam = waktuWIB.getUTCHours();
-        const menit = waktuWIB.getUTCMinutes();
+        // Perbaikan zona waktu yang lebih akurat
+        const formatter = new Intl.DateTimeFormat('id-ID', {
+            timeZone: 'Asia/Jakarta',
+            hour: 'numeric',
+            minute: 'numeric',
+            hour12: false
+        });
+        const [timeString] = formatter.format(new Date()).split(' ');
+        const [jam, menit] = timeString.split('.').map(Number); // id-ID biasanya pakai titik (19.30)
 
-        console.log(`Waktu saat ini (WIB): ${jam}:${menit.toString().padStart(2, '0')}`);
+        console.log(`Waktu saat ini (WIB): ${jam}:${menit}`);
 
         const channel = await client.channels.fetch(ANNOUNCEMENT_CHANNEL_ID);
         
         if (channel) {
-            // Logika Jam 19:30 - 19:59 WIB (Duty Reminder)
+            // Jam 19:30 - 19:59 WIB
             if (jam === 19 && menit >= 30) { 
                 await channel.send("📢 **PENGUMUMAN DUTY**\nWAKTUNYA DUTY JIKA BERHALANGAN SILAHKAN IZIN ATAU CUTI DI https://san-andreas-police-departement.netlify.app/\n\n@everyone");
                 console.log("Pesan Duty terkirim.");
             } 
-            // Logika Jam 22:00 - 22:59 WIB (Absensi Reminder)
+            // Jam 22:00 - 22:59 WIB
             else if (jam === 22) {
-                await channel.send("📢 **REMINDER ABSENSI**\nJANGAN LUPA UNTUK MENGISI KEHADIRAN DI https://san-anndreas-police-departement.netlify.app/\n\n@everyone");
+                await channel.send("📢 **REMINDER ABSENSI**\nJANGAN LUPA UNTUK MENGISI KEHADIRAN DI https://san-andreas-police-departement.netlify.app/\n\n@everyone");
                 console.log("Pesan Absensi terkirim.");
             }
         }
@@ -145,9 +155,8 @@ client.once('ready', async () => {
     } catch (err) {
         console.error("Terjadi kesalahan fatal:", err.message);
     } finally {
-        // Kasih jeda 8 detik agar semua proses asinkron Supabase benar-benar selesai
-        console.log("Proses selesai, bot akan dimatikan.");
-        setTimeout(() => process.exit(), 8000);
+        console.log("Proses selesai, bot akan dimatikan dalam 5 detik.");
+        setTimeout(() => process.exit(), 5000);
     }
 });
 
