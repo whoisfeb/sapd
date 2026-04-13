@@ -275,10 +275,15 @@ function bukaModalPelanggaranUU() {
     const modalUU = document.getElementById('modal-pelanggaran-uu');
     if (!modalUU) return;
 
+    // Menampilkan data dasar
     document.getElementById('uu-nama').innerText = tempWarningData.nama_anggota;
     document.getElementById('uu-pangkat').innerText = tempWarningData.pangkat_anggota;
     document.getElementById('uu-divisi').innerText = userWeekly[tempWarningData.discord_id]?.info?.divisi || "-";
-
+    
+    // PERBAIKAN: Menampilkan Total SP yang dimiliki user saat ini
+    const spSekarang = tempWarningData.currentWarn || 0;
+    document.getElementById('uu-sp-saat-ini').innerText = spSekarang;
+    
     const container = document.getElementById('uu-list-container');
     container.innerHTML = "";
     
