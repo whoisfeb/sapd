@@ -1,6 +1,7 @@
 /**
- * REKAP.JS - FULL VERSION (READABLE)
+ * REKAP.JS - FULL VERSION (UPDATED WITH UU SYSTEM)
  * Perbaikan: Urutan Inisialisasi Supabase & Security
+ * Penambahan: Pilihan Warning Kehadiran & Pelanggaran (uu.js)
  */
 
 // --- 1. INISIALISASI SUPABASE (WAJIB DI PALING ATAS) ---
@@ -11,30 +12,27 @@ const _supabase = window.supabase.createClient(
 
 let currentWeekOffset = 0;
 let userWeekly = {}; 
+let tempWarningData = {}; // Menyimpan data sementara saat tombol klik
 
 // --- 2. SISTEM KEAMANAN & AUTHENTICATION ---
 async function checkAuth() {
     const discordId = localStorage.getItem("discord_id");
     const isAdminLocal = localStorage.getItem("is_admin");
 
-    // Jika di browser tidak ada data admin, langsung lempar ke dashboard
     if (!discordId || isAdminLocal !== "true") {
         return accessDenied();
     }
 
-    // CEK VALIDASI KE DATABASE SUPABASE
     const { data: user, error } = await _supabase
         .from('users_master')
         .select('is_admin')
         .eq('discord_id', discordId)
         .single();
 
-    // Jika di database status adminnya sudah dicabut/salah, kunci aksesnya
     if (error || !user || user.is_admin !== true) {
         localStorage.setItem("is_admin", "false"); 
         return accessDenied();
     } else {
-        // Jika benar admin, baru tampilkan halaman dan muat data
         document.body.style.display = "block";
         loadData(); 
     }
@@ -45,7 +43,6 @@ function accessDenied() {
     window.location.href = "dashboard.html";
 }
 
-// Jalankan proteksi segera setelah client supabase siap
 checkAuth();
 
 // --- 3. LOGIKA UTAMA: MUAT DATA MINGGUAN ---
@@ -63,7 +60,6 @@ async function loadData() {
         .from('users_master')
         .select('*');
 
-    // Sorting berdasarkan Pangkat (RANK_ORDER)
     if (typeof RANK_ORDER !== 'undefined' && masters) {
         masters.sort((a, b) => (RANK_ORDER[a.pangkat.toUpperCase()] || 99) - (RANK_ORDER[b.pangkat.toUpperCase()] || 99));
     }
@@ -87,7 +83,6 @@ async function loadData() {
             const ketAsli = (log.jam_duty || "").toUpperCase();
             const status = ketAsli.includes("IZIN") ? "IZIN" : (ketAsli.includes("CUTI") ? "CUTI" : "HADIR");
 
-            // Mapping detail untuk Popup
             userWeekly[discordId].days[d] = { 
                 status: status,
                 ket: ketAsli,
@@ -113,8 +108,6 @@ async function loadData() {
 
     document.getElementById('tbody-weekly').innerHTML = masters.map(m => {
         const u = userWeekly[m.discord_id];
-
-        // Hitung Gaji (Jika fungsi tersedia)
         const hasilGaji = typeof hitungGajiMember === 'function' 
             ? hitungGajiMember(m.pangkat, u.totalHadir) 
             : { gajiAkhir: 0 };
@@ -133,7 +126,6 @@ async function loadData() {
             if (data.status === "IZIN") { label = "I"; iconClass = "status-ic"; }
             if (data.status === "CUTI") { label = "C"; iconClass = "status-ic"; }
 
-            // Ubah data objek menjadi string untuk parameter onclick
             const dataStr = JSON.stringify(data).replace(/"/g, '&quot;');
             return `<span class="${iconClass}" style="cursor:pointer;" onclick="openDetailPopup('${m.nama_anggota}', '${m.pangkat}', ${dataStr})">${label}</span>`;
         };
@@ -146,7 +138,7 @@ async function loadData() {
             <td class="salary-text">$${totalGaji.toLocaleString()}</td>
             <td>
                 <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
-                    <button class="btn-warning" onclick="sendWarning('${m.discord_id}', '${m.nama_anggota}', '${m.pangkat}', ${cWarn}, '${currentAdminName}', '${currentAdminRank}')">⚠️ Warning (${cWarn})</button>
+                    <button class="btn-warning" onclick="pilihJenisWarning('${m.discord_id}', '${m.nama_anggota}', '${m.pangkat}', ${cWarn}, '${currentAdminName}', '${currentAdminRank}')">⚠️ Warning (${cWarn})</button>
                     ${cWarn > 0 ? `<span class="unwarn-link" onclick="removeWarning('${m.discord_id}', '${m.nama_anggota}', '${m.pangkat}', ${cWarn}, '${currentAdminName}', '${currentAdminRank}')">[ Cabut SP ]</span>` : ''}
                 </div>
             </td>
@@ -165,7 +157,6 @@ function openDetailPopup(nama, pangkat, data) {
     content.style.maxHeight = "80vh";
     content.style.overflowY = "auto";
 
-    // Pecah string bukti_foto menjadi array jika ada banyak gambar
     const daftarGambar = data.bukti && data.bukti !== "N/A" ? data.bukti.split(', ') : [];
 
     content.innerHTML = `
@@ -177,21 +168,8 @@ function openDetailPopup(nama, pangkat, data) {
                 .pop-label { width: 100px; color: #00adb5; font-weight: bold; flex-shrink: 0; }
                 .pop-colon { width: 20px; flex-shrink: 0; text-align: center; }
                 .pop-val { flex-grow: 1; word-break: break-word; overflow-wrap: anywhere; }
-                .img-thumbnail-container { 
-                    display: flex; 
-                    flex-wrap: wrap; 
-                    gap: 10px; 
-                    margin-top: 10px; 
-                }
-                .img-thumbnail { 
-                    width: 100px; 
-                    height: 100px; 
-                    object-fit: cover; 
-                    border-radius: 6px; 
-                    border: 2px solid #30475e; 
-                    cursor: pointer; 
-                    transition: transform 0.2s;
-                }
+                .img-thumbnail-container { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+                .img-thumbnail { width: 100px; height: 100px; object-fit: cover; border-radius: 6px; border: 2px solid #30475e; cursor: pointer; transition: transform 0.2s; }
                 .img-thumbnail:hover { transform: scale(1.05); border-color: #00adb5; }
             </style>
 
@@ -219,7 +197,6 @@ function openDetailPopup(nama, pangkat, data) {
                         `<div style="width:100%; padding:20px; text-align:center; background:#222831; border-radius:8px; color:#666;">Tidak ada bukti gambar.</div>`
                     }
                 </div>
-                ${daftarGambar.length > 0 ? `<p style="font-size: 10px; color: #666; margin-top: 5px;">* Klik gambar untuk melihat ukuran penuh</p>` : ''}
             </div>
         </div>
     `;
@@ -230,55 +207,33 @@ function closeDetailPopup() {
     document.getElementById('modal-detail').style.display = "none";
 }
 
-// Tutup popup jika klik di luar area modal
-window.onclick = function(event) {
-    const modal = document.getElementById('modal-detail');
-    if (event.target == modal) closeDetailPopup();
-}
+// --- 5. FITUR WARNING & SELEKSI JENIS (BARU) ---
 
-// --- 5. FITUR WARNING & DISCORD INTEGRATION ---
-async function sendWarning(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank) {
-    // Munculkan pilihan: OK untuk Kehadiran, Cancel untuk Pelanggaran UU
-    const pilihan = confirm("Pilih Jenis Peringatan:\n\n[OK] = Warning KEHADIRAN (Otomatis cek bolos)\n[CANCEL] = Warning PELANGGARAN (Pilih Manual dari UU)");
-
-    if (pilihan) {
-        // Jika pilih Kehadiran, jalankan fungsi otomatis
-        executeWarningKehadiran(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank);
-    } else {
-        // Jika pilih Pelanggaran, buka popup checkbox
-        openPelanggaranPopup(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank);
-    }
-}
-
-async function removeWarning(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank) {
-    if (!confirm(`Cabut SP untuk ${nama_anggota}?\n(Oleh: ${adminName} - ${adminRank})`)) return;
-    const newWarnCount = Math.max(0, currentWarn - 1);
-
-    const logPayload = {
-        "content": "<@&1444908462067945623>",
-        "embeds": [{
-            "title": `🔓 PENCABUTAN SURAT PERINGATAN`,
-            "color": 3066993,
-            "description": `**Tanggal:** ${new Date().toLocaleDateString('id-ID')}\n**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat Anggota:** ${pangkat_anggota}\n\n**Status:** 1 SP telah dicabut.\n**Sisa SP:** ${newWarnCount}\n\n**Dicabut Oleh:** ${adminName}\n**Pangkat Admin:** ${adminRank}`,
-            "timestamp": new Date()
-        }]
-    };
-
-    await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
+// Fungsi yang dipanggil oleh tombol Warning di tabel
+function pilihJenisWarning(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank) {
+    tempWarningData = { discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank };
     
-    const res = await fetch('/.netlify/functions/send-warning', { 
-        method: 'POST', 
-        body: JSON.stringify({ payload: logPayload, updateList: await updateDiscordList() }) 
-    });
-
-    if (res.ok) { 
-        alert("SP Berhasil dicabut!"); 
-        loadData(); 
+    // Tampilkan Modal Pilihan Warning (Pastikan ID ini ada di HTML Anda)
+    const modalPilihan = document.getElementById('modal-warning-pilihan');
+    if (modalPilihan) {
+        modalPilihan.style.display = "flex";
+    } else {
+        // Jika belum ada modal di HTML, gunakan confirm sederhana
+        if (confirm("Klik OK untuk Warning Kehadiran\nKlik CANCEL untuk Warning Pelanggaran (UU)")) {
+            sendWarning(); // Jalankan fungsi asli (kehadiran)
+        } else {
+            bukaModalPelanggaranUU();
+        }
     }
 }
 
-// --- FUNGSI LOGIKA KEHADIRAN (OTOMATIS) ---
-async function executeWarningKehadiran(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank) {
+// FUNGSI ASLI: WARNING KEHADIRAN (Hanya ganti nama fungsi agar lebih spesifik)
+async function sendWarning() {
+    // Data diambil dari tempWarningData jika dipicu lewat pilihJenisWarning
+    const { discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank } = tempWarningData;
+    
+    if (!confirm(`Kirim SP-${currentWarn + 1} Kehadiran ke Discord?`)) return;
+    
     const { mon } = getWeekRange(currentWeekOffset);
     const u = userWeekly[discord_id];
     const daftarBolos = [];
@@ -296,7 +251,7 @@ async function executeWarningKehadiran(discord_id, nama_anggota, pangkat_anggota
     }
 
     if (daftarBolos.length === 0) {
-        alert("Anggota ini tidak memiliki riwayat bolos s/d kemarin.");
+        alert("Tidak ditemukan riwayat bolos s/d kemarin.");
         return;
     }
 
@@ -304,109 +259,133 @@ async function executeWarningKehadiran(discord_id, nama_anggota, pangkat_anggota
     const logPayload = {
         "content": "@everyone <@&1444908462067945623>",
         "embeds": [{
-            "title": `📋 SURAT PERINGATAN (KEHADIRAN) - SP ${newWarnCount}`,
+            "title": `📋 SURAT PERINGATAN (SP - ${newWarnCount}) - KEHADIRAN`,
             "color": 15285324,
-            "description": `**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat:** ${pangkat_anggota}\n\n**Detail Ketidakhadiran:**\n${daftarBolos.join('\n')}\n\n**Pemberi Sanksi:** ${adminName}`,
+            "description": `**Nama Anggota:** ${nama_anggota}\n**Pangkat:** ${pangkat_anggota}\n\n**Alasan:** Tidak memenuhi syarat kehadiran mingguan.\n\n**Detail:**\n${daftarBolos.join('\n')}\n\n**Pemberi:** ${adminName}`,
             "timestamp": new Date()
         }]
     };
 
-    await processWarningSubmission(discord_id, newWarnCount, logPayload);
+    await executeWarningFinal(discord_id, newWarnCount, logPayload, nama_anggota);
 }
 
-// --- FUNGSI POPUP PELANGGARAN (MANUAL DARI UU.JS) ---
-function openPelanggaranPopup(discord_id, nama, pangkat, currentWarn, adminName, adminRank) {
-    const modal = document.getElementById('modal-detail');
-    const content = document.getElementById('detail-content');
-    const divisi = userWeekly[discord_id]?.info?.divisi || "-";
+// FUNGSI BARU: Buka Modal UU
+function bukaModalPelanggaranUU() {
+    const modalUU = document.getElementById('modal-pelanggaran-uu');
+    if (!modalUU) return alert("Modal Pelanggaran (modal-pelanggaran-uu) belum ada di HTML.");
 
-    // Membuat daftar checkbox dari data UU.js
-    let htmlUU = "";
-    if (typeof DATA_UU !== 'undefined') {
-        htmlUU = DATA_UU.map((item, index) => `
-            <div style="display:flex; align-items:flex-start; gap:10px; margin-bottom:10px; background:#222831; padding:10px; border-radius:5px; border-left:4px solid #e94560;">
-                <input type="checkbox" class="cb-uu" value="${index}" style="margin-top:4px; width:18px; height:18px;">
-                <div style="font-size:12px;">
-                    <div style="font-weight:bold; color:#00adb5;">Pasal ${item.pasal}: ${item.pelanggaran}</div>
-                    <div style="color:#bbb;">Denda: <span style="color:#2ecc71;">$${item.denda.toLocaleString()}</span> | Sanksi: <span style="color:#e94560;">${item.sanksi}</span></div>
-                </div>
-            </div>
-        `).join('');
-    } else {
-        htmlUU = "<p style='color:red;'>Gagal memuat data UU.js. Pastikan file uu.js sudah di-import di rekap.html</p>";
-    }
+    // Set Info Otomatis
+    document.getElementById('uu-nama').innerText = tempWarningData.nama_anggota;
+    document.getElementById('uu-pangkat').innerText = tempWarningData.pangkat_anggota;
+    document.getElementById('uu-divisi').innerText = userWeekly[tempWarningData.discord_id].info.divisi || "-";
 
-    content.innerHTML = `
-        <h3 style="text-align:center; color:#e94560; margin-bottom:15px; border-bottom:2px solid #30475e; padding-bottom:10px;">FORM PELANGGARAN ANGGOTA</h3>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:15px; background:#30475e; padding:10px; border-radius:8px; font-size:12px;">
-            <div><b>Nama:</b> ${nama}</div>
-            <div><b>Divisi:</b> ${divisi}</div>
-            <div><b>Pangkat:</b> ${pangkat}</div>
-            <div><b>Status:</b> SP-${currentWarn}</div>
-        </div>
-        <div style="max-height: 350px; overflow-y: auto; padding-right:10px; margin-bottom:20px;">
-            ${htmlUU}
-        </div>
-        <button onclick="submitPelanggaranManual('${discord_id}', '${nama}', '${pangkat}', ${currentWarn}, '${adminName}', '${adminRank}')" 
-                style="width:100%; padding:12px; background:#e94560; color:white; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">
-                KIRIM SURAT PERINGATAN
-        </button>
-    `;
-    modal.style.display = "flex";
-}
+    // Parsing uu.js (kodeHTML)
+    const container = document.getElementById('uu-list-container');
+    container.innerHTML = "";
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(kodeHTML, 'text/html');
+    const sections = doc.querySelectorAll('section');
 
-// --- FUNGSI SUBMIT PELANGGARAN MANUAL ---
-async function submitPelanggaranManual(discord_id, nama, pangkat, currentWarn, adminName, adminRank) {
-    const selected = Array.from(document.querySelectorAll('.cb-uu:checked')).map(cb => DATA_UU[cb.value]);
+    sections.forEach(sec => {
+        const title = sec.querySelector('.bab-title').innerText;
+        const pasals = sec.querySelectorAll('.pasal');
+        pasals.forEach(pas => {
+            const label = pas.querySelector('.pasal-label').innerText;
+            const penalty = pas.querySelector('.penalty-box').innerText;
+            const dendaMatch = penalty.match(/Denda Rp ([\d.]+)/);
+            const dendaVal = dendaMatch ? parseInt(dendaMatch[1].replace(/\./g, '')) : 0;
 
-    if (selected.length === 0) return alert("Pilih minimal satu jenis pelanggaran!");
-
-    let detailTeks = "";
-    let totalDenda = 0;
-    selected.forEach(p => {
-        detailTeks += `- Pasal ${p.pasal}: ${p.pelanggaran} (${p.sanksi})\n`;
-        totalDenda += p.denda;
+            const div = document.createElement('div');
+            div.style.marginBottom = "8px";
+            div.innerHTML = `
+                <input type="checkbox" class="cb-uu" data-denda="${dendaVal}" data-label="${label}" onchange="hitungUU()">
+                <label style="color:#00adb5; font-size:12px; margin-left:5px;"><b>${label}</b> (${title})</label>
+                <div style="font-size:10px; color:#888; margin-left:22px;">${penalty}</div>
+            `;
+            container.appendChild(div);
+        });
     });
 
-    const newWarnCount = currentWarn + 1;
+    modalUU.style.display = "flex";
+}
+
+function hitungUU() {
+    let total = 0;
+    document.querySelectorAll('.cb-uu:checked').forEach(cb => total += parseInt(cb.dataset.denda));
+    document.getElementById('uu-total-denda').innerText = "Rp " + total.toLocaleString('id-ID');
+}
+
+async function kirimWarningPelanggaran() {
+    const selected = document.querySelectorAll('.cb-uu:checked');
+    if (selected.length === 0) return alert("Pilih minimal satu pelanggaran!");
+
+    let list = [];
+    let totalDenda = 0;
+    selected.forEach(cb => {
+        list.push(cb.dataset.label);
+        totalDenda += parseInt(cb.dataset.denda);
+    });
+
+    const newWarnCount = tempWarningData.currentWarn + 1;
     const logPayload = {
         "content": "@everyone <@&1444908462067945623>",
         "embeds": [{
-            "title": `⚖️ SURAT PERINGATAN (PELANGGARAN) - SP ${newWarnCount}`,
-            "color": 15105570,
-            "description": `**Nama Anggota:** ${nama} (<@${discord_id}>)\n**Pangkat:** ${pangkat}\n\n**Pelanggaran:**\n${detailTeks}\n**Total Denda:** $${totalDenda.toLocaleString()}\n\n**Pemberi Sanksi:** ${adminName}\n**Pangkat Admin:** ${adminRank}`,
+            "title": `⚖️ SURAT PERINGATAN (SP - ${newWarnCount}) - PELANGGARAN UU`,
+            "color": 16711680,
+            "description": `**Nama Anggota:** ${tempWarningData.nama_anggota}\n**Pangkat:** ${tempWarningData.pangkat_anggota}\n\n**Pelanggaran:**\n${list.join(', ')}\n\n**Total Denda:** Rp ${totalDenda.toLocaleString('id-ID')}\n\n**Pemberi:** ${tempWarningData.adminName}`,
             "timestamp": new Date()
         }]
     };
 
-    if (confirm("Kirim Peringatan Pelanggaran ini?")) {
-        closeDetailPopup();
-        await processWarningSubmission(discord_id, newWarnCount, logPayload);
-    }
+    await executeWarningFinal(tempWarningData.discord_id, newWarnCount, logPayload, tempWarningData.nama_anggota);
+    document.getElementById('modal-pelanggaran-uu').style.display = "none";
 }
 
-async function processWarningSubmission(discord_id, newWarnCount, logPayload) {
+// Fungsi Internal Pengiriman Final
+async function executeWarningFinal(discord_id, newCount, payload, nama) {
     try {
-        // 1. Update SP di Database
-        await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
-        
-        // 2. Kirim ke Discord (Netlify Function)
+        await _supabase.from('users_master').update({ total_warning: newCount }).eq('discord_id', discord_id);
         const res = await fetch('/.netlify/functions/send-warning', { 
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                payload: logPayload, 
-                updateList: await updateDiscordList() 
-            }) 
+            body: JSON.stringify({ payload: payload, updateList: await updateDiscordList() }) 
         });
-
-        if (res.ok) { 
-            alert("Berhasil! Peringatan telah dikirim dan tercatat."); 
-            loadData(); 
+        if (res.ok) {
+            alert(`SP Berhasil dikirim untuk ${nama}!`);
+            loadData();
+            const modalPilihan = document.getElementById('modal-warning-pilihan');
+            if (modalPilihan) modalPilihan.style.display = "none";
         }
     } catch (err) {
         console.error(err);
-        alert("Gagal memproses peringatan.");
+        alert("Gagal mengirim data.");
+    }
+}
+
+// FUNGSI CABUT SP (ASLI)
+async function removeWarning(discord_id, nama_anggota, pangkat_anggota, currentWarn, adminName, adminRank) {
+    if (!confirm(`Cabut SP untuk ${nama_anggota}?\n(Oleh: ${adminName} - ${adminRank})`)) return;
+    const newWarnCount = Math.max(0, currentWarn - 1);
+
+    const logPayload = {
+        "content": "<@&1444908462067945623>",
+        "embeds": [{
+            "title": `🔓 PENCABUTAN SURAT PERINGATAN`,
+            "color": 3066993,
+            "description": `**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Sisa SP:** ${newWarnCount}\n\n**Dicabut Oleh:** ${adminName}`,
+            "timestamp": new Date()
+        }]
+    };
+
+    await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
+    const res = await fetch('/.netlify/functions/send-warning', { 
+        method: 'POST', 
+        body: JSON.stringify({ payload: logPayload, updateList: await updateDiscordList() }) 
+    });
+
+    if (res.ok) { 
+        alert("SP Berhasil dicabut!"); 
+        loadData(); 
     }
 }
 
@@ -440,7 +419,6 @@ function downloadExcel() {
         rows.push(rowData);
     });
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{wch:25}, {wch:20}, {wch:8}, {wch:8}, {wch:8}, {wch:8}, {wch:8}, {wch:8}, {wch:8}, {wch:12}];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Rekap");
     XLSX.writeFile(wb, `Rekap_SAPD.xlsx`);
@@ -452,16 +430,7 @@ function downloadPDF() {
     doc.autoTable({
         html: '#table-rekap',
         columns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-        theme: 'grid',
-        styles: { fontSize: 8, lineWidth: 0.1, lineColor: [48, 71, 94] },
-        didParseCell: function(data) {
-            if (data.cell.section === 'body') {
-                const txt = data.cell.raw.innerText;
-                if (txt === '✔') { data.cell.styles.fillColor = [39, 174, 96]; data.cell.styles.textColor = 255; }
-                else if (txt === 'I' || txt === 'C') { data.cell.styles.fillColor = [243, 156, 18]; data.cell.styles.textColor = 255; }
-                else if (txt === '✘') { data.cell.styles.fillColor = [233, 69, 96]; data.cell.styles.textColor = 255; }
-            }
-        }
+        theme: 'grid'
     });
     doc.save(`Rekap_SAPD.pdf`);
 }
@@ -481,77 +450,23 @@ function getWeekRange(offset = 0) {
 }
 
 async function resetUser(id) {
-    if (!confirm("Hapus data absensi & bukti gambar anggota ini di minggu ini?")) return;
+    if (!confirm("Hapus data absensi minggu ini?")) return;
     const { mon, sun } = getWeekRange(currentWeekOffset);
-    
-    const { data: logs } = await _supabase.from('absensi_sapd')
-        .select('bukti_foto') 
-        .eq('discord_id', id)
-        .gte('created_at', mon.toISOString())
-        .lte('created_at', sun.toISOString());
-
-    if (logs && logs.length > 0) {
-        let filesToRemove = [];
-        logs.forEach(log => {
-            if (log.bukti_foto && log.bukti_foto !== "N/A") {
-                const urls = log.bukti_foto.split(', ');
-                urls.forEach(url => {
-                    const fileName = url.split('/absensi/')[1];
-                    if (fileName) filesToRemove.push(`absensi/${fileName}`);
-                });
-            }
-        });
-
-        if (filesToRemove.length > 0) {
-            await _supabase.storage.from('bukti-absen').remove(filesToRemove);
-        }
-    }
-
-    await _supabase.from('absensi_sapd')
-        .delete()
-        .eq('discord_id', id)
-        .gte('created_at', mon.toISOString())
-        .lte('created_at', sun.toISOString());
-
-    alert("Data dan Gambar berhasil dihapus!");
-    loadData();
-}
-
-async function resetAllWeeklyData() {
-    if (!confirm("Hapus SEMUA data absensi & bukti gambar minggu ini?")) return;
-    const { mon, sun } = getWeekRange(currentWeekOffset);
-
-    const { data: allLogs } = await _supabase.from('absensi_sapd')
-        .select('bukti_foto')
-        .gte('created_at', mon.toISOString())
-        .lte('created_at', sun.toISOString());
-
-    if (allLogs && allLogs.length > 0) {
-        let filesToRemove = [];
-        allLogs.forEach(log => {
-            if (log.bukti_foto && log.bukti_foto !== "N/A") {
-                const urls = log.bukti_foto.split(', ');
-                urls.forEach(url => {
-                    const fileName = url.split('/absensi/')[1];
-                    if (fileName) filesToRemove.push(`absensi/${fileName}`);
-                });
-            }
-        });
-        if (filesToRemove.length > 0) {
-            await _supabase.storage.from('bukti-absen').remove(filesToRemove);
-        }
-    }
-
-    await _supabase.from('absensi_sapd')
-        .delete()
-        .gte('created_at', mon.toISOString())
-        .lte('created_at', sun.toISOString());
-
-    alert("Seluruh data minggu ini telah dibersihkan!");
+    await _supabase.from('absensi_sapd').delete().eq('discord_id', id).gte('created_at', mon.toISOString()).lte('created_at', sun.toISOString());
     loadData();
 }
 
 function changeWeek(dir) { 
     currentWeekOffset += dir; 
     loadData(); 
+}
+
+// Klik luar modal untuk menutup
+window.onclick = function(event) {
+    const modalD = document.getElementById('modal-detail');
+    const modalP = document.getElementById('modal-warning-pilihan');
+    const modalU = document.getElementById('modal-pelanggaran-uu');
+    if (event.target == modalD) modalD.style.display = "none";
+    if (event.target == modalP) modalP.style.display = "none";
+    if (event.target == modalU) modalU.style.display = "none";
 }
