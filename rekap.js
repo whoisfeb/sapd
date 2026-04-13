@@ -243,14 +243,29 @@ async function sendWarning(discord_id, nama_anggota, pangkat_anggota, currentWar
     const { mon } = getWeekRange(currentWeekOffset);
     const u = userWeekly[discord_id];
     const daftarBolos = [];
-    const hari = ["", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    const hariNames = ["", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
     
-    for(let i=1; i<=6; i++) { 
-        if(!u.days[i]) { 
-            const t=new Date(mon); 
-            t.setDate(mon.getDate()+(i-1)); 
-            daftarBolos.push(`- ${hari[i]}, ${t.toLocaleDateString('id-ID')}`); 
+    // --- LOGIKA PEMBATASAN HARI ---
+    // Ambil waktu sekarang dan set ke jam 00:00 hari ini untuk pembanding
+    const hariIni = new Date();
+    hariIni.setHours(0, 0, 0, 0);
+
+    for(let i = 1; i <= 6; i++) { 
+        // Hitung tanggal untuk setiap kolom hari (Senin=1, Selasa=2, dst)
+        const tglTarget = new Date(mon); 
+        tglTarget.setDate(mon.getDate() + (i - 1)); 
+        tglTarget.setHours(0, 0, 0, 0);
+
+        // Syarat: Jika data kosong DIBAWAH tanggal hari ini (berarti sudah lewat/kemarin)
+        if(!u.days[i] && tglTarget < hariIni) { 
+            daftarBolos.push(`- ${hariNames[i]}, ${tglTarget.toLocaleDateString('id-ID')}`); 
         } 
+    }
+
+    // Jika admin mengirim di hari Senin atau user rajin sampai kemarin, daftarBolos akan kosong
+    if (daftarBolos.length === 0) {
+        alert("Tidak ditemukan riwayat bolos dari hari Senin sampai kemarin.\nSP tidak dapat dikirim jika belum ada hari yang terlewati.");
+        return;
     }
 
     const newWarnCount = currentWarn + 1;
@@ -259,21 +274,34 @@ async function sendWarning(discord_id, nama_anggota, pangkat_anggota, currentWar
         "embeds": [{
             "title": `📋 SURAT PERINGATAN (SP - ${newWarnCount})`,
             "color": 15285324,
-            "description": `**Tanggal:** ${new Date().toLocaleDateString('id-ID')}\n**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat:** ${pangkat_anggota}\n\n**Alasan Peringatan:**\nTidak memenuhi syarat kehadiran mingguan.\nDetail Bolos:\n${daftarBolos.join('\n')}\n**Total SP:** ${newWarnCount}\n\n**Pemberi Peringatan:** ${adminName}\n**Pangkat:** ${adminRank}`,
+            "description": `**Tanggal:** ${new Date().toLocaleDateString('id-ID')}\n**Nama Anggota:** ${nama_anggota} (<@${discord_id}>)\n**Pangkat:** ${pangkat_anggota}\n\n**Alasan Peringatan:**\nTidak memenuhi syarat kehadiran mingguan.\n\n**Detail Ketidakhadiran (s/d Kemarin):**\n${daftarBolos.join('\n')}\n\n**Total SP:** ${newWarnCount}\n\n**Pemberi Peringatan:** ${adminName}\n**Pangkat:** ${adminRank}`,
             "timestamp": new Date()
         }]
     };
 
-    await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
-    
-    const res = await fetch('/.netlify/functions/send-warning', { 
-        method: 'POST', 
-        body: JSON.stringify({ payload: logPayload, updateList: await updateDiscordList() }) 
-    });
+    try {
+        // Update database Supabase
+        await _supabase.from('users_master').update({ total_warning: newWarnCount }).eq('discord_id', discord_id);
+        
+        // Kirim ke Discord via Netlify Function
+        const res = await fetch('/.netlify/functions/send-warning', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                payload: logPayload, 
+                updateList: await updateDiscordList() 
+            }) 
+        });
 
-    if (res.ok) { 
-        alert("SP Terkirim!"); 
-        loadData(); 
+        if (res.ok) { 
+            alert(`SP-${newWarnCount} berhasil dikirim ke Discord untuk ${nama_anggota}!`); 
+            loadData(); 
+        } else {
+            throw new Error("Gagal mengirim ke Discord.");
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Terjadi kesalahan saat memproses SP.");
     }
 }
 
