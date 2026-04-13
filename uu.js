@@ -217,7 +217,7 @@ const kodeHTML = `
             <h2 class="bab-title">BAB 12: Penangkapan Dasar</h2>
             <div class="pasal">
                 <span class="pasal-label">Pasal 14</span>
-                <div class="ayat"><div class="ayat-n">1.</div><div>Melakukan penangkapan tanpa prosedur identifikasi diri yang jelas.</div></div>
+                <div class="ayat"><div class="ayat-n">1.</div><div>Melakukan penangkapan yang tidak sesuai dengan prosedur.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
                     MIN: Denda Rp 15.000 | SP 1<br>
@@ -312,11 +312,11 @@ const kodeHTML = `
             <h2 class="bab-title">BAB 16: Prosedur Interogasi</h2>
             <div class="pasal">
                 <span class="pasal-label">Pasal 18</span>
-                <div class="ayat"><div class="ayat-n">1.</div><div>Melakukan tindakan kekerasan berlebihan yang menyebabkan cacat pada terperiksa.</div></div>
+                <div class="ayat"><div class="ayat-n">1.</div><div>Melakukan interogasi yang tidak sesuai dengan prosedur.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 20.000.000 | Penjara 36 Bulan<br>
-                    MAX: Denda Rp 75.000.000 | Penjara 72 Bulan
+                    MIN: Denda Rp 20.000 | SP 1<br>
+                    MAX: Denda Rp 35.000 | SP 1 + Penurunan Pangkat
                 </div>
             </div>
         </section>
@@ -329,8 +329,8 @@ const kodeHTML = `
                 <div class="ayat"><div class="ayat-n">1.</div><div>Sengaja menghilangkan, merusak, atau menukar barang bukti asli.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 30.000.000 | Penjara 48 Bulan<br>
-                    MAX: Denda Rp 150.000.000 | Penjara 120 Bulan + PTDH
+                    MIN: Denda Rp 30.000 | Penjara 10 Bulan<br>
+                    MAX: Denda Rp 40.000 | Penjara 15 Bulan + PTDH
                 </div>
             </div>
         </section>
@@ -340,11 +340,11 @@ const kodeHTML = `
             <h2 class="bab-title">BAB 18: Olah TKP</h2>
             <div class="pasal">
                 <span class="pasal-label">Pasal 20</span>
-                <div class="ayat"><div class="ayat-n">1.</div><div>Membiarkan TKP terkontaminasi atau sengaja merusak garis polisi.</div></div>
+                <div class="ayat"><div class="ayat-n">1.</div><div>Membiarkan TKP terkontaminasi atau sengaja merusak garis polisi/parimeter/pembatas yang telah di pasang.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 5.000.000 | Penjara 1 Bulan<br>
-                    MAX: Denda Rp 15.000.000 | Penjara 6 Bulan
+                    MIN: Denda Rp 5.000 | Teguran<br>
+                    MAX: Denda Rp 15.000 | SP 1
                 </div>
             </div>
         </section>
@@ -357,8 +357,8 @@ const kodeHTML = `
                 <div class="ayat"><div class="ayat-n">1.</div><div>Menggunakan alat penyadap instansi untuk memantau privasi personil lain tanpa izin.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 10.000.000 | Penjara 12 Bulan<br>
-                    MAX: Denda Rp 30.000.000 | Penjara 24 Bulan
+                    MIN: Denda Rp 5.000 | SP 1<br>
+                    MAX: Denda Rp 10.000 | SP 1 + Larangan Patroli Selama 1 Hari + Wajib menjaga pelayanan selama 1 Hari
                 </div>
             </div>
         </section>
@@ -371,8 +371,8 @@ const kodeHTML = `
                 <div class="ayat"><div class="ayat-n">1.</div><div>Korupsi atau laporan fiktif terkait biaya operasional informan lapangan.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 25.000.000 | Penjara 36 Bulan<br>
-                    MAX: Denda Rp 100.000.000 | Penjara 60 Bulan + PTDH
+                    MIN: Denda Rp 50.000 | Penjara 36 Bulan<br>
+                    MAX: Denda Rp 100.000 | Penjara 60 Bulan + PTDH
                 </div>
             </div>
         </section>
@@ -385,8 +385,8 @@ const kodeHTML = `
                 <div class="ayat"><div class="ayat-n">1.</div><div>Melakukan tindakan represif tanpa perintah Komandan Satuan (Dansat).</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 10.000.000 | Penjara 6 Bulan<br>
-                    MAX: Denda Rp 25.000.000 | Penjara 12 Bulan
+                    MIN: Denda Rp 25.000 | Penjara 6 Bulan<br>
+                    MAX: Denda Rp 50.000 | Penjara 12 Bulan
                 </div>
             </div>
         </section>
@@ -399,8 +399,8 @@ const kodeHTML = `
                 <div class="ayat"><div class="ayat-n">1.</div><div>Menembakkan gas air mata ke area pemukiman padat tanpa urgensi tinggi.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 15.000.000 | Penjara 12 Bulan<br>
-                    MAX: Denda Rp 40.000.000 | Penjara 24 Bulan
+                    MIN: Denda Rp 10.000 | Teguran<br>
+                    MAX: Denda Rp 15.000 | SP 1
                 </div>
             </div>
         </section>
@@ -410,11 +410,11 @@ const kodeHTML = `
             <h2 class="bab-title">BAB 23: Tilang Manual</h2>
             <div class="pasal">
                 <span class="pasal-label">Pasal 25</span>
-                <div class="ayat"><div class="ayat-n">1.</div><div>Menarik denda tunai di tempat tanpa memberikan slip resmi bank.</div></div>
+                <div class="ayat"><div class="ayat-n">1.</div><div>Melakukan Penilangan tanpa melalui invoice.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 5.000.000 | Penjara 3 Bulan<br>
-                    MAX: Denda Rp 20.000.000 | Penjara 12 Bulan
+                    MIN: Denda Rp 25.000 | SP 1<br>
+                    MAX: Denda Rp 50.000 | SP 1 + Penurunan Pangkat
                 </div>
             </div>
         </section>
@@ -427,8 +427,8 @@ const kodeHTML = `
                 <div class="ayat"><div class="ayat-n">1.</div><div>Sengaja merekayasa alat bukti demi menaikkan status tersangka (Kriminalisasi).</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 50.000.000 | Penjara 60 Bulan<br>
-                    MAX: Denda Rp 250.000.000 | Penjara 180 Bulan + PTDH
+                    MIN: Denda Rp 15.000 | SP 1<br>
+                    MAX: Denda Rp 30.000 | SP 1 + Penurunan Pangkat
                 </div>
             </div>
         </section>
@@ -441,8 +441,8 @@ const kodeHTML = `
                 <div class="ayat"><div class="ayat-n">1.</div><div>Positif mengonsumsi narkotika hasil sitaan atau distribusi ilegal.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 100.000.000 | Penjara 120 Bulan<br>
-                    MAX: Denda Rp 1.000.000.000 | Penjara Seumur Hidup + PTDH
+                    MIN: Denda Rp 50.000 | SP 1 + Penjara 20 Bulant<br>
+                    MAX: Denda Rp 100.000 | PTDH
                 </div>
             </div>
         </section>
@@ -455,8 +455,8 @@ const kodeHTML = `
                 <div class="ayat"><div class="ayat-n">1.</div><div>Menggunakan otoritas akses database negara untuk kepentingan pemerasan.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 75.000.000 | Penjara 48 Bulan<br>
-                    MAX: Denda Rp 300.000.000 | Penjara 96 Bulan + PTDH
+                    MIN: Denda Rp 50.000 | SP 1<br>
+                    MAX: Denda Rp 100.000 | Penjara 40 + Penurunan Pangkat
                 </div>
             </div>
         </section>
@@ -469,8 +469,8 @@ const kodeHTML = `
                 <div class="ayat"><div class="ayat-n">1.</div><div>Membawa senjata api ke tempat hiburan malam atau lokasi yang dilarang protokol.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 5.000.000 | Penjara 7 Hari<br>
-                    MAX: Denda Rp 15.000.000 | Penjara 30 Hari
+                    MIN: Denda Rp 15.000 | SP 1<br>
+                    MAX: Denda Rp 20.000 | SP 1 + Penurunan Pangkat
                 </div>
             </div>
         </section>
@@ -491,119 +491,104 @@ const kodeHTML = `
 
         <!-- BAB 29 -->
         <section id="bab29">
-            <h2 class="bab-title">BAB 29: Divisi Propam</h2>
+            <h2 class="bab-title">BAB 29: Internak Affairs Division</h2>
             <div class="pasal">
                 <span class="pasal-label">Pasal 31</span>
-                <div class="ayat"><div class="ayat-n">1.</div><div>Menolak diperiksa oleh anggota Propam dalam rangka investigasi internal.</div></div>
+                <div class="ayat"><div class="ayat-n">1.</div><div>Menolak diperiksa oleh anggota Internal Affairs Division dalam rangka investigasi internal.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 5.000.000 | Penjara 14 Hari<br>
-                    MAX: Denda Rp 20.000.000 | Penjara 60 Hari
+                    MIN: Denda Rp 10.000 | Penjara 14 Bulan<br>
+                    MAX: Denda Rp 20.000 | Penjara 28 Bulan
+                </div>
+                <div class="ayat"><div class="ayat-n">2.</div><div>Melakukan perlawanan fisik saat akan ditertibkan oleh Internal Affairs Division.</div></div>
+                <div class="penalty-box">
+                    <span class="denda-text">SANKSI AYAT 2:</span>
+                    MIN: Denda Rp 15.000 | Penjara 15 Bulan<br>
+                    MAX: Denda Rp 30.000 | Penjara 30 Bulan
                 </div>
             </div>
         </section>
 
+
         <!-- BAB 30 -->
         <section id="bab30">
-            <h2 class="bab-title">BAB 30: Provos Disiplin</h2>
+            <h2 class="bab-title">BAB 30: Kekayaan Personil</h2>
             <div class="pasal">
                 <span class="pasal-label">Pasal 32</span>
-                <div class="ayat"><div class="ayat-n">1.</div><div>Melakukan perlawanan fisik saat akan ditertibkan oleh Provos.</div></div>
+                <div class="ayat"><div class="ayat-n">1.</div><div>Tidak mampu menjelaskan asal-usul harta kekayaan yang melebihi pendapatan logis (Money Laundering).</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 10.000.000 | Penjara 30 Hari<br>
-                    MAX: Denda Rp 30.000.000 | Penjara 90 Hari
+                    MIN: Denda Rp 10.000 | Teguran<br>
+                    MAX: Denda Rp 20.000 | Teguran
                 </div>
             </div>
         </section>
 
         <!-- BAB 31 -->
         <section id="bab31">
-            <h2 class="bab-title">BAB 31: Tes Urin</h2>
+            <h2 class="bab-title">BAB 31: Kode Etik Profesi</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 33</span>
-                <div class="ayat"><div class="ayat-n">1.</div><div>Sengaja menukar sampel urin atau memanipulasi hasil tes laboratorium.</div></div>
+                <span class="pasal-label">Pasal 35</span>
+                <div class="ayat"><div class="ayat-n">1.</div><div>Mencemarkan kehormatan kepolisian Polku melalui perilaku menyimpang di publik.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 50.000.000 | Penjara 12 Bulan<br>
-                    MAX: Denda Rp 150.000.000 | Penjara 36 Bulan + PTDH
+                    MIN: Denda Rp 25.000 | Penjara 20 Bulan<br>
+                    MAX: Denda Rp 50.000 | Penjara 40 Bulan
                 </div>
             </div>
         </section>
 
         <!-- BAB 32 -->
         <section id="bab32">
-            <h2 class="bab-title">BAB 32: Kekayaan Personil</h2>
+            <h2 class="bab-title">BAB 32: Sidang Internal</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 34</span>
-                <div class="ayat"><div class="ayat-n">1.</div><div>Tidak mampu menjelaskan asal-usul harta kekayaan yang melebihi pendapatan logis (Money Laundering).</div></div>
+                <span class="pasal-label">Pasal 36</span>
+                <div class="ayat"><div class="ayat-n">1.</div><div>Memberikan keterangan palsu di bawah sumpah saat sidang komisi kode etik.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 100.000.000 | Penjara 48 Bulan<br>
-                    MAX: Sita Seluruh Aset + PTDH
+                    MIN: Denda Rp 10.000 | - <br>
+                    MAX: Denda Rp 15.000 | -
+                </div>
+                <div class="ayat"><div class="ayat-n">2.</div><div>Tidak menghadiri persidangan internal dengan alasan apapun .</div></div>
+                <div class="penalty-box">
+                    <span class="denda-text">SANKSI AYAT 2:</span>
+                    MIN: Denda Rp Maksimal | Maksimal<br>
+                    MAX: Denda Rp Maksimal | Maksimal
                 </div>
             </div>
         </section>
 
         <!-- BAB 33 -->
         <section id="bab33">
-            <h2 class="bab-title">BAB 33: Kode Etik Profesi</h2>
+            <h2 class="bab-title">BAB 33: Skorsing</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 35</span>
-                <div class="ayat"><div class="ayat-n">1.</div><div>Mencemarkan kehormatan kepolisian Polku melalui perilaku menyimpang di publik.</div></div>
+                <span class="pasal-label">Pasal 37</span>
+                <div class="ayat"><div class="ayat-n">1.</div><div>Masuk ke area dinas tanpa izin tertulis selama masa skorsing aktif.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 5.000.000 | Penjara 1 Bulan<br>
-                    MAX: Denda Rp 25.000.000 | Penjara 12 Bulan
+                    MIN: Denda Rp 5.000 | Teguran<br>
+                    MAX: Denda Rp 10.000 | Teguran
                 </div>
             </div>
         </section>
 
         <!-- BAB 34 -->
         <section id="bab34">
-            <h2 class="bab-title">BAB 34: Sidang Internal</h2>
+            <h2 class="bab-title">BAB 34: Patsus Sel</h2>
             <div class="pasal">
-                <span class="pasal-label">Pasal 36</span>
-                <div class="ayat"><div class="ayat-n">1.</div><div>Memberikan keterangan palsu di bawah sumpah saat sidang komisi kode etik.</div></div>
+                <span class="pasal-label">Pasal 38</span>
+                <div class="ayat"><div class="ayat-n">1.</div><div>Melarikan diri atau mencoba merusak fasilitas sel penempatan khusus.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 20.000.000 | Penjara 24 Bulan<br>
-                    MAX: Denda Rp 50.000.000 | Penjara 48 Bulan
+                    MIN: Denda Rp 15.000| Penjara 6 Bulan<br>
+                    MAX: Denda Rp 50.000 | Penjara 12 Bulan
                 </div>
             </div>
         </section>
 
         <!-- BAB 35 -->
         <section id="bab35">
-            <h2 class="bab-title">BAB 35: Skorsing</h2>
-            <div class="pasal">
-                <span class="pasal-label">Pasal 37</span>
-                <div class="ayat"><div class="ayat-n">1.</div><div>Masuk ke area dinas tanpa izin tertulis selama masa skorsing aktif.</div></div>
-                <div class="penalty-box">
-                    <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 2.000.000 | Penjara 7 Hari<br>
-                    MAX: Denda Rp 10.000.000 | Penjara 30 Hari
-                </div>
-            </div>
-        </section>
-
-        <!-- BAB 36 -->
-        <section id="bab36">
-            <h2 class="bab-title">BAB 36: Patsus Sel</h2>
-            <div class="pasal">
-                <span class="pasal-label">Pasal 38</span>
-                <div class="ayat"><div class="ayat-n">1.</div><div>Melarikan diri atau mencoba merusak fasilitas sel penempatan khusus.</div></div>
-                <div class="penalty-box">
-                    <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Denda Rp 15.000.000 | Penjara 6 Bulan<br>
-                    MAX: Denda Rp 50.000.000 | Penjara 24 Bulan
-                </div>
-            </div>
-        </section>
-
-        <!-- BAB 37 -->
-        <section id="bab37">
-            <h2 class="bab-title">BAB 37: PTDH Pecat</h2>
+            <h2 class="bab-title">BAB 35: PTDH Pecat</h2>
             <div class="pasal">
                 <span class="pasal-label">Pasal 39</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Personil yang di-PTDH wajib mengembalikan seluruh inventaris negara dalam 1x24 jam.</div></div>
@@ -614,22 +599,22 @@ const kodeHTML = `
             </div>
         </section>
 
-        <!-- BAB 38 -->
-        <section id="bab38">
-            <h2 class="bab-title">BAB 38: Blacklist NRP</h2>
+        <!-- BAB 36 -->
+        <section id="bab36">
+            <h2 class="bab-title">BAB 36: Blacklist NRP</h2>
             <div class="pasal">
                 <span class="pasal-label">Pasal 40</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Mencoba mendaftar kembali atau masuk ke lingkungan militer/polisi dengan NRP palsu.</div></div>
                 <div class="penalty-box">
                     <span class="denda-text">SANKSI AYAT 1:</span>
-                    MIN: Penjara 72 Bulan | Denda Rp 100.000.000
+                    MIN: Denda Rp 100.000 | Penjara 30 Bulan
                 </div>
             </div>
         </section>
 
-        <!-- BAB 39 -->
-        <section id="bab39">
-            <h2 class="bab-title">BAB 39: Denda Administratif</h2>
+        <!-- BAB 37 -->
+        <section id="bab37">
+            <h2 class="bab-title">BAB 37: Denda Administratif</h2>
             <div class="pasal">
                 <span class="pasal-label">Pasal 41</span>
                 <div class="ayat"><div class="ayat-n">1.</div><div>Kelalaian membayar denda administratif yang telah dijatuhkan secara inkrah.</div></div>
