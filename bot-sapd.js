@@ -65,6 +65,24 @@ const DIVISI_MAP = {
     "1444921352120434819": "INTERNAL AFFAIRS DIVISION"
 };
 
+// --- FUNGSI VALIDASI URL ---
+function isValidUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    
+    // Trim whitespace
+    url = url.trim();
+    
+    // Check if starts with http
+    if (!url.startsWith('http://') && !url.startsWith('https://')) return false;
+    
+    try {
+        new URL(url);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 // --- FUNGSI 1: CLEANUP USER YANG TIDAK PUNYA REQUIRED ROLE DARI USERS_MASTER ---
 async function cleanupUsersWithoutRole(guild) {
     console.log("[CLEANUP-1] Memulai cleanup user tanpa required role dari users_master...");
@@ -106,7 +124,7 @@ async function cleanupUsersWithoutRole(guild) {
 
                     if (!absenErr && absenRecords && absenRecords.length > 0) {
                         for (const record of absenRecords) {
-                            if (record.bukti_foto && record.bukti_foto.startsWith("http")) {
+                            if (record.bukti_foto && isValidUrl(record.bukti_foto)) {
                                 try {
                                     const namaFile = record.bukti_foto.split('/').pop();
                                     const pathLengkap = `absensi/${namaFile}`;
@@ -216,8 +234,8 @@ async function cleanupOrphanedAbsences(guild) {
                 if (!userExistsInDb && !hasRequiredRole) {
                     console.log(`[CLEANUP-2] Data absensi ${absenceRecord.id} (user: ${discordId}) orphaned, menghapus...`);
 
-                    // 3A. HAPUS GAMBAR BUKTI JIKA ADA
-                    if (absenceRecord.bukti_foto && absenceRecord.bukti_foto.startsWith("http")) {
+                    // 3A. HAPUS GAMBAR BUKTI JIKA ADA & VALID
+                    if (absenceRecord.bukti_foto && isValidUrl(absenceRecord.bukti_foto)) {
                         try {
                             const namaFile = absenceRecord.bukti_foto.split('/').pop();
                             const pathLengkap = `absensi/${namaFile}`;
@@ -331,10 +349,17 @@ async function processForumLogs(guild) {
                     .setTimestamp(new Date(log.created_at))
                     .setFooter({ text: "SAPD Attendance System" });
 
-                if (log.bukti_foto && log.bukti_foto.startsWith("http")) {
+                // SET GAMBAR HANYA JIKA URL VALID
+                if (log.bukti_foto && isValidUrl(log.bukti_foto)) {
                     reportEmbed.setImage(log.bukti_foto);
+                    console.log(`  ✓ Gambar set: ${log.bukti_foto.substring(0, 50)}...`);
                 } else {
-                    reportEmbed.addFields({ name: 'Bukti Gambar', value: "⚠️ Tidak melampirkan gambar.", inline: false });
+                    // Jika tidak ada gambar atau URL tidak valid, skip - jangan tambahkan field warning
+                    if (!log.bukti_foto) {
+                        console.log(`  ℹ Tidak ada gambar untuk ID ${log.id}`);
+                    } else {
+                        console.warn(`  ⚠ URL tidak valid untuk ID ${log.id}: ${log.bukti_foto.substring(0, 50)}...`);
+                    }
                 }
 
                 await targetThread.send({ embeds: [reportEmbed] });
@@ -343,32 +368,44 @@ async function processForumLogs(guild) {
                 // Tunggu sebentar sebelum hapus file/update
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
-                if (log.bukti_foto && log.bukti_foto.startsWith("http")) {
-                    const ambilNamaFile = log.bukti_foto.split('/').pop();
-                    const pathLengkap = `absensi/${ambilNamaFile}`;
-                    
-                    const { error: delError } = await supabase.storage
-                        .from(STORAGE_BUCKET_NAME)
-                        .remove([pathLengkap]);
-                    
-                    if (delError) {
-                        console.error(`[STORAGE ERROR] Gagal hapus file: ${pathLengkap}`);
+                // HAPUS GAMBAR HANYA JIKA URL VALID
+                if (log.bukti_foto && isValidUrl(log.bukti_foto)) {
+                    try {
+                        const ambilNamaFile = log.bukti_foto.split('/').pop();
+                        const pathLengkap = `absensi/${ambilNamaFile}`;
+                        
+                        const { error: delError } = await supabase.storage
+                            .from(STORAGE_BUCKET_NAME)
+                            .remove([pathLengkap]);
+                        
+                        if (delError) {
+                            console.warn(`[STORAGE WARN] Gagal hapus file ${pathLengkap}: ${delError.message}`);
+                        } else {
+                            console.log(`  ✓ File storage dihapus: ${ambilNamaFile}`);
+                        }
+                    } catch (storageErr) {
+                        console.warn(`[STORAGE WARN] Error saat hapus file:`, storageErr.message);
                     }
                 }
 
+                // UPDATE is_archived TETAP DILAKUKAN
                 const { error: upError } = await supabase
                     .from('absensi_sapd')
                     .update({ is_archived: true })
                     .eq('id', log.id);
 
                 if (upError) {
-                    console.error(`[DB ERROR] Gagal update archive ID: ${log.id}`);
+                    console.error(`[DB ERROR] Gagal update archive ID: ${log.id}: ${upError.message}`);
+                } else {
+                    console.log(`  ✓ Data ID ${log.id} di-archive`);
                 }
 
             } catch (errLoop) {
                 console.error(`[LOOP ERROR] Gagal memproses data ID ${log.id}:`, errLoop.message);
             }
         }
+        
+        console.log("[DEBUG] Selesai proses forum logs.");
     } catch (errGlobal) {
         console.error("[CRITICAL ERROR] processForumLogs:", errGlobal.message);
     }
@@ -477,7 +514,7 @@ async function runSapdTask() {
 }
 
 // --- EVENT BOT READY ---
-client.once('ready', () => {
+client.once('clientReady', () => {
     console.log("\n========================================");
     console.log(`Bot Terhubung Sebagai: ${client.user.tag}`);
     console.log("Status: Online & Monitoring Supabase");
