@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, ChannelType } = require('discord.js');
 const { createClient } = require('@supabase/supabase-js');
 
 // 1. INISIALISASI KONEKSI
@@ -23,7 +23,7 @@ const PANGKAT_MAP = {
     "1444918698484826173": "CAPTAIN II",
     "1444918744815112302": "CAPTAIN I",
     "1444918819717124186": "LIEUTENANT III",
-    "144491867691569244": "LIEUTENANT II", // Perbaikan Typo ID jika ada
+    "144491867691569244": "LIEUTENANT II",
     "1444918922766843904": "LIEUTENANT I",
     "1444919014139756685": "SERGEANT III",
     "1444919052815564910": "SERGEANT II",
@@ -47,10 +47,75 @@ const DIVISI_MAP = {
 
 // 3. KONFIGURASI ID
 const ANNOUNCEMENT_CHANNEL_ID = "1492812998379700246"; 
+const FORUM_CHANNEL_ID = "1493906313342615692"; 
+const STORAGE_BUCKET_NAME = "bukti-absen"; // Nama bucket Anda
 const REQUIRED_ROLE_ID = "1444908462067945623"; 
 const ADMIN_ROLE_ID = "1444910578266148897"; 
 
-// --- FUNGSI TAMBAHAN: CEK ABSENSI ---
+// --- FUNGSI LOGS KE FORUM & HAPUS STORAGE ---
+async function processForumLogs(guild) {
+    try {
+        const forumChannel = await guild.channels.fetch(FORUM_CHANNEL_ID);
+        if (!forumChannel || forumChannel.type !== ChannelType.GuildForum) return;
+
+        // Cari data yang memiliki bukti_foto (belum diproses)
+        const { data: logs, error } = await supabase
+            .from('absensi_sapd')
+            .select('*')
+            .not('bukti_foto', 'is', null);
+
+        if (error || !logs || logs.length === 0) return;
+
+        for (const log of logs) {
+            const threads = await forumChannel.threads.fetchActive();
+            let thread = threads.threads.find(t => t.name.toLowerCase() === log.nama_anggota.toLowerCase());
+
+            // Buat thread baru jika belum ada
+            if (!thread) {
+                thread = await forumChannel.threads.create({
+                    name: log.nama_anggota,
+                    message: { content: `Logs Kehadiran untuk **${log.nama_anggota}**` },
+                });
+            }
+
+            // Kirim Embed ke Forum Thread
+            const embed = new EmbedBuilder()
+                .setTitle(`LOG KEHADIRAN - ${log.status}`)
+                .setColor(log.status === 'HADIR' ? 0x2ecc71 : 0xf1c40f)
+                .addFields(
+                    { name: 'Pangkat', value: log.pangkat, inline: true },
+                    { name: 'Divisi', value: log.divisi, inline: true },
+                    { name: 'Keterangan', value: log.keterangan || "Tidak ada keterangan", inline: false }
+                )
+                .setImage(log.bukti_foto)
+                .setTimestamp(new Date(log.created_at));
+
+            await thread.send({ embeds: [embed] });
+
+            // LOGIKA HAPUS STORAGE (FOLDER absensi/)
+            const fileName = log.bukti_foto.split('/').pop();
+            const fullPath = `absensi/${fileName}`; // Path sesuai folder Anda
+
+            const { error: storageError } = await supabase.storage
+                .from(STORAGE_BUCKET_NAME)
+                .remove([fullPath]);
+
+            if (!storageError) {
+                // Update DB: set null agar tidak dikirim ulang
+                await supabase.from('absensi_sapd')
+                    .update({ bukti_foto: null })
+                    .eq('id', log.id);
+                console.log(`[FORUM] Log terkirim & storage dihapus: ${fullPath}`);
+            } else {
+                console.error(`[STORAGE ERROR] ${storageError.message}`);
+            }
+        }
+    } catch (err) {
+        console.error("Gagal memproses forum logs:", err.message);
+    }
+}
+
+// --- FUNGSI CEK ABSENSI (REMINDER) ---
 async function checkMissingAbsence(channel) {
     try {
         const { data: allUsers, error: errUsers } = await supabase.from('users_master').select('discord_id');
@@ -108,7 +173,6 @@ async function runSapdTask() {
                 activeDiscordIds.push(member.id);
                 const isUserAdmin = member.roles.cache.has(ADMIN_ROLE_ID);
 
-                // Update data di absensi agar sinkron bagi yang masih aktif
                 updateTasks.push(
                     supabase.from('absensi_sapd').update({
                         nama_anggota: freshName,
@@ -133,22 +197,17 @@ async function runSapdTask() {
         // --- PEMBERSIHAN DATA (CARA B) ---
         if (activeDiscordIds.length > 0) {
             const formattedIds = `(${activeDiscordIds.join(',')})`;
-            
-            // Hapus dari users_master yang sudah tidak punya role
-            await supabase.from('users_master')
-                .delete()
-                .not('discord_id', 'in', formattedIds);
-
-            // Hapus dari absensi_sapd (termasuk riwayat & gambar) yang sudah tidak punya role
-            await supabase.from('absensi_sapd')
-                .delete()
-                .not('discord_id', 'in', formattedIds);
+            await supabase.from('users_master').delete().not('discord_id', 'in', formattedIds);
+            await supabase.from('absensi_sapd').delete().not('discord_id', 'in', formattedIds);
         }
 
         const { error: upsertError } = await supabase.from('users_master').upsert(dataToUpsert, { onConflict: 'discord_id' });
         if (upsertError) throw upsertError;
+
+        // --- JALANKAN FORUM LOGS ---
+        await processForumLogs(guild);
         
-        console.log("Sinkronisasi & Pembersihan Berhasil.");
+        console.log("Sinkronisasi, Pembersihan, & Forum Logs Berhasil.");
 
         // --- BROADCAST & REMINDER (WIB) ---
         const now = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Jakarta"}));
