@@ -14,23 +14,23 @@ const client = new Client({
 // --- KONFIGURASI CHANNEL & TOKEN ---
 // ==========================================
 const TOKEN = process.env.DISCORD_BOT_TOKEN; 
-const PROMOTION_CHANNEL_ID = process.env.DISCORD_PROMOTION_CHANNEL_ID || '1444904948692422756'; // Channel input format
-const NOTIF_CHANNEL_ID = '1493137414175326249'; // Channel log/notif sistem
+const PROMOTION_CHANNEL_ID = process.env.DISCORD_PROMOTION_CHANNEL_ID || '1444904948692422756';
+const NOTIF_CHANNEL_ID = '1493137414175326249'; 
 
 // ==========================================
-// --- ROLE UTAMA (WARGA & POLISI) ---
+// --- ROLE IDENTITAS UTAMA (WAJIB BENAR) ---
 // ==========================================
-const WARGA_ROLE_ID = '1444920482578173953';       // Role: Warga Excellence
-const POLICE_MAIN_ROLE_ID = '1444908462067945623'; // Role: Excellence Police (Role Inti)
+const WARGA_ROLE_ID = '1444908142587547658';       // Role: Warga Excellence
+const POLICE_MAIN_ROLE_ID = '1444908462067945623'; // Role: Excellence Police
 
 // ==========================================
 // --- 1. MAPPING PREFIX NICKNAME ---
 // ==========================================
 const rankPrefixes = {
-    '1444909938001580257': 'COP',       // Chief of Police
-    '1444909771181522974': 'ACOP',      // Assistant Chief
-    '1444909625475596349': 'DCOP',      // Deputy Chief
-    '1444908730230771723': 'COM',       // Commissioner
+    '1444909938001580257': 'COP',
+    '1444909771181522974': 'ACOP',
+    '1444909625475596349': 'DCOP',
+    '1444908730230771723': 'COM',
     '1444918644600606770': 'CAPT III',
     '1444918698484826173': 'CAPT II',
     '1444918744815112302': 'CAPT I',
@@ -53,39 +53,29 @@ const rankPrefixes = {
 // --- 2. MAPPING ROLE KELOMPOK (GROUPS) ---
 // ==========================================
 const groupRoles = {
-    // POLICE OFFICER GROUP
-    '1444919938891649145': '1444918351037206570', // PO III -> Police Officer
-    '1444920044239982673': '1444918351037206570', // PO II  -> Police Officer
-    '1444920144793964595': '1444918351037206570', // PO I   -> Police Officer
-
-    // DETECTIVE GROUP
-    '1444919660054188032': '1444918302508843139', // DET III -> Detective
-    '1444919733114896465': '1444918302508843139', // DET II  -> Detective
-    '1444919777553420339': '1444918302508843139', // DET I   -> Detective
-
-    // SUPERVISOR GROUP
-    '1444919014139756685': '1469596428706910292', // SGT III -> Supervisor
-    '1444919052815564910': '1469596428706910292', // SGT II  -> Supervisor
-    '1444919550981308426': '1469596428706910292', // SGT I   -> Supervisor
-
-    // COMMAND TEAM GROUP
-    '1444918819717124186': '1444910648516415488', // LT III -> Command Team
-    '1444918867691569244': '1444910648516415488', // LT II  -> Command Team
-    '1444918922766843904': '1444910648516415488', // LT I   -> Command Team
-    '1444918644600606770': '1444910648516415488', // CAPT III -> Command Team
-    '1444918698484826173': '1444910648516415488', // CAPT II  -> Command Team
-    '1444918744815112302': '1444910648516415488', // CAPT I   -> Command Team
-
-    // HIGH COMMAND GROUP
-    '1444908730230771723': '1444910578266148897', // COM   -> High Command
-    '1444909625475596349': '1444910578266148897', // DCOP  -> High Command
-    '1444909771181522974': '1444910578266148897', // ACOP  -> High Command
-    '1444909938001580257': '1444910578266148897', // COP   -> High Command
+    '1444919938891649145': '1444918351037206570', // Group: Police Officer
+    '1444920044239982673': '1444918351037206570',
+    '1444920144793964595': '1444918351037206570',
+    '1444919660054188032': '1444918302508843139', // Group: Detective
+    '1444919733114896465': '1444918302508843139',
+    '1444919777553420339': '1444918302508843139',
+    '1444919014139756685': '1469596428706910292', // Group: Supervisor
+    '1444919052815564910': '1469596428706910292',
+    '1444919550981308426': '1469596428706910292',
+    '1444918819717124186': '1444910648516415488', // Group: Command Team
+    '1444918867691569244': '1444910648516415488',
+    '1444918922766843904': '1444910648516415488',
+    '1444918644600606770': '1444910648516415488',
+    '1444918698484826173': '1444910648516415488',
+    '1444918744815112302': '1444910648516415488',
+    '1444908730230771723': '1444910578266148897', // Group: High Command
+    '1444909625475596349': '1444910578266148897',
+    '1444909771181522974': '1444910578266148897',
+    '1444909938001580257': '1444910578266148897',
 };
 
 // ==========================================
-// --- 3. DAFTAR SEMUA ROLE POLISI ---
-// (Digunakan untuk membersihkan user saat keluar polisi)
+// --- 3. DAFTAR MEMBERSIHKAN ROLE POLISI ---
 // ==========================================
 const allGroupIDs = [
     POLICE_MAIN_ROLE_ID,    // Excellence Police
@@ -96,7 +86,6 @@ const allGroupIDs = [
     '1444910578266148897'  // Group: High Command
 ];
 
-// --- LOGIC READY ---
 client.once('ready', () => {
     console.log(`Bot login sebagai ${client.user.tag}`);
     const notifChannel = client.channels.cache.get(NOTIF_CHANNEL_ID);
@@ -106,7 +95,6 @@ client.once('ready', () => {
     }
 });
 
-// --- MAIN MESSAGE LOGIC ---
 client.on('messageCreate', async (message) => {
     if (message.author.bot || message.channel.id !== PROMOTION_CHANNEL_ID) return;
 
@@ -133,29 +121,32 @@ client.on('messageCreate', async (message) => {
                 const member = await message.guild.members.fetch(userID);
                 const botMember = message.guild.members.me;
 
-                // Cek hierarki bot
-                if (member.roles.highest.position >= botMember.roles.highest.position) continue;
+                // PROTEKSI HIERARKI: Bot tidak bisa ubah member yang rolenya lebih tinggi dari bot
+                if (member.roles.highest.position >= botMember.roles.highest.position) {
+                    console.warn(`[SKIP] Role ${member.user.tag} terlalu tinggi untuk Bot.`);
+                    continue;
+                }
 
                 const newRankID = newRankMatch ? newRankMatch[1] : null;
 
-                // --- LOGIKA JIKA PINDAH KE WARGA (EXIT POLICE) ---
+                // --- PROSES KELUAR POLISI (DEMOTE KE WARGA) ---
                 if (newRankID === WARGA_ROLE_ID) {
-                    // Cabut pangkat terakhir
+                    // 1. Cabut Pangkat Terakhir
                     if (prevRankMatch) await member.roles.remove(prevRankMatch[1]).catch(() => null);
                     
-                    // Cabut semua role kelompok & role polisi utama
+                    // 2. Cabut Semua Role Kelompok (Termasuk Excellence Police)
                     for (const groupID of allGroupIDs) {
                         if (member.roles.cache.has(groupID)) {
-                            await member.roles.remove(groupID).catch(() => null);
+                            await member.roles.remove(groupID).catch(e => console.error(`Gagal cabut group ${groupID}: ${e.message}`));
                         }
                     }
 
-                    // Cabut divisi
+                    // 3. Cabut Divisi
                     if (prevDivs) {
                         for (const div of prevDivs) await member.roles.remove(div.replace(/[<@&>]/g, '')).catch(() => null);
                     }
 
-                    // Tambah role warga & Update Nickname ke Civil
+                    // 4. Tambah Warga Excellence & Reset Nickname ke Civil
                     await member.roles.add(WARGA_ROLE_ID).catch(console.error);
                     
                     let cleanName = member.displayName;
@@ -163,7 +154,7 @@ client.on('messageCreate', async (message) => {
                     const newNickname = `Civil | ${cleanName}`.substring(0, 32);
                     await member.setNickname(newNickname).catch(() => null);
                 } 
-                // --- LOGIKA POLISI BIASA (UPDATE PANGKAT/DIVISI) ---
+                // --- PROSES POLISI NORMAL (PROMOSI/DEMOSI PANGKAT) ---
                 else {
                     if (prevRankMatch) await member.roles.remove(prevRankMatch[1]).catch(() => null);
                     if (newRankID) await member.roles.add(newRankID).catch(console.error);
@@ -175,9 +166,11 @@ client.on('messageCreate', async (message) => {
                         for (const div of newDivs) await member.roles.add(div.replace(/[<@&>]/g, '')).catch(console.error);
                     }
 
+                    // Sinkronisasi Role Kelompok
                     if (newRankID && groupRoles[newRankID]) {
                         const targetGroupID = groupRoles[newRankID];
                         for (const groupID of allGroupIDs) {
+                            // Jangan cabut Role Inti (Excellence Police) saat update pangkat biasa
                             if (member.roles.cache.has(groupID) && groupID !== targetGroupID && groupID !== POLICE_MAIN_ROLE_ID) {
                                 await member.roles.remove(groupID).catch(() => null);
                             }
@@ -185,6 +178,7 @@ client.on('messageCreate', async (message) => {
                         await member.roles.add(targetGroupID).catch(console.error);
                     }
 
+                    // Update Prefix Nickname
                     if (newRankID && rankPrefixes[newRankID]) {
                         const prefix = rankPrefixes[newRankID];
                         let cleanName = member.displayName;
@@ -202,7 +196,6 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// --- SYSTEM OFFLINE NOTIF ---
 async function sendOfflineNotif() {
     const notifChannel = client.channels.cache.get(NOTIF_CHANNEL_ID);
     if (notifChannel) {
