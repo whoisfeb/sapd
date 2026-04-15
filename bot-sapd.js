@@ -9,8 +9,7 @@ const client = new Client({
     intents: [
         GatewayIntentBits.Guilds, 
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
+        GatewayIntentBits.GuildMessages
     ] 
 });
 
@@ -46,76 +45,14 @@ const DIVISI_MAP = {
     "1444921352120434819": "INTERNAL AFFAIRS DIVISION"
 };
 
-// 3. KONFIGURASI ID & STORAGE
+// 3. KONFIGURASI ID
 const ANNOUNCEMENT_CHANNEL_ID = "1492812998379700246"; 
-const LOG_FORUM_CHANNEL_ID = "1493885969164668988"; // ID Channel Forum logs-kehadiran
+const LOG_FORUM_CHANNEL_ID = "1493885969164668988"; // Sesuaikan dengan ID Channel logs-kehadiran
 const REQUIRED_ROLE_ID = "1444908462067945623"; 
 const ADMIN_ROLE_ID = "1444910578266148897"; 
-const BUCKET_NAME = "bukti-absen"; // Sesuaikan dengan nama Bucket di Supabase Storage kamu
+const BUCKET_NAME = "bukti-absen";
 
-// --- FUNGSI ARSIP KE FORUM & HAPUS STORAGE ---
-async function archiveAbsensiToForum() {
-    console.log("Memeriksa data absensi untuk diarsip...");
-    try {
-        const { data: recentAbsen, error: fetchError } = await supabase
-            .from('absensi_sapd')
-            .select('*')
-            .eq('is_archived', false);
-
-        if (fetchError) throw fetchError;
-        if (!recentAbsen || recentAbsen.length === 0) return console.log("Tidak ada data baru untuk diarsip.");
-
-        const forumChannel = await client.channels.fetch(LOG_FORUM_CHANNEL_ID);
-
-        for (const log of recentAbsen) {
-            const threadName = log.nama_anggota;
-            
-            // Cari thread yang ada (aktif/archived)
-            const fetchedThreads = await forumChannel.threads.fetch();
-            let thread = fetchedThreads.threads.find(t => t.name === threadName);
-
-            if (!thread) {
-                thread = await forumChannel.threads.create({
-                    name: threadName,
-                    message: { content: `📑 **LOG KEHADIRAN: ${log.nama_anggota}**\nID: ${log.discord_id}` }
-                });
-                console.log(`Thread baru dibuat: ${threadName}`);
-            }
-
-            // Kirim pesan ke dalam thread
-            await thread.send({
-                content: `🗓️ **LAPORAN KEHADIRAN**\n**Tanggal:** ${new Date(log.created_at).toLocaleDateString('id-ID')}\n**Pangkat:** ${log.pangkat}\n**Divisi:** ${log.divisi}\n**Status:** HADIR`,
-                files: log.foto_url ? [log.foto_url] : []
-            });
-
-            // Tandai sudah diarsip di Database
-            await supabase.from('absensi_sapd').update({ is_archived: true }).eq('id', log.id);
-
-            // HAPUS GAMBAR DARI STORAGE
-            if (log.foto_url) {
-                // 1. Ambil nama file dari URL (misal: 1776057614489_ls2s0.jpg)
-                const fileName = log.foto_url.split('/').pop();
-                
-                // 2. Gabungkan dengan nama folder 'absensi' sesuai di screenshot kamu
-                const fullPath = `absensi/${fileName}`;
-
-                const { error: deleteError } = await supabase.storage
-                    .from(BUCKET_NAME)
-                    .remove([fullPath]);
-
-                if (deleteError) {
-                    console.error(`Gagal menghapus file ${fullPath}:`, deleteError.message);
-                } else {
-                    console.log(`Berhasil: Gambar ${fullPath} dihapus dari storage.`);
-                }
-            }
-        }
-    } catch (err) {
-        console.error("Kesalahan proses arsip:", err.message);
-    }
-}
-
-// --- FUNGSI CEK ABSENSI (REMINDER) ---
+// --- FUNGSI TAMBAHAN: CEK ABSENSI ---
 async function checkMissingAbsence(channel) {
     try {
         const { data: allUsers, error: errUsers } = await supabase.from('users_master').select('discord_id');
@@ -145,7 +82,92 @@ async function checkMissingAbsence(channel) {
     }
 }
 
-// 4. FUNGSI UTAMA PENGECEKAN & SINKRONISASI
+// --- FUNGSI BARU: ARSIP FORUM & CLEANUP ---
+// --- [BAGIAN ATAS SCRIPT TETAP SAMA] ---
+
+async function archiveAndCleanup(guild) {
+    console.log("Menjalankan prosedur Arsip & Cleanup...");
+    try {
+        const forumChannel = await client.channels.fetch(LOG_FORUM_CHANNEL_ID);
+
+        // 1. PROSES ARSIP (Kirim data baru ke forum)
+        const { data: recentAbsen, error: errFetch } = await supabase
+            .from('absensi_sapd')
+            .select('*')
+            .eq('is_archived', false);
+
+        if (recentAbsen && recentAbsen.length > 0) {
+            for (const log of recentAbsen) {
+                const threadName = log.nama_anggota;
+                const fetchedThreads = await forumChannel.threads.fetch();
+                let thread = fetchedThreads.threads.find(t => t.name === threadName);
+
+                if (!thread) {
+                    thread = await forumChannel.threads.create({
+                        name: threadName,
+                        message: { content: `📑 **LOG KEHADIRAN: ${log.nama_anggota}**` }
+                    });
+                }
+
+                // PERBAIKAN: Mengambil status asli (HADIR/IZIN/CUTI) dari database
+                const statusUser = log.status ? log.status.toUpperCase() : "HADIR";
+                const emoji = (statusUser === "HADIR") ? "✅" : "⚠️";
+                
+                const contentMsg = `${emoji} **LAPORAN ${statusUser}**\n` +
+                                   `**Tanggal:** ${new Date(log.created_at).toLocaleDateString('id-ID')}\n` +
+                                   `**Pangkat:** ${log.pangkat || '-'}\n` +
+                                   `**Divisi:** ${log.divisi || '-'}\n` +
+                                   (statusUser !== "HADIR" ? `**Alasan:** ${log.alasan || '-'}` : `**Keterangan:** Bertugas di Kota`);
+
+                // KIRIM SEBAGAI FILE (Bukan URL saja)
+                await thread.send({
+                    content: contentMsg,
+                    files: (statusUser === "HADIR" && log.foto_url) ? [log.foto_url] : []
+                });
+
+                // Tandai sudah diarsip
+                await supabase.from('absensi_sapd').update({ is_archived: true }).eq('id', log.id);
+
+                // Hapus gambar dari storage (karena sudah pindah ke Discord)
+                if (log.foto_url) {
+                    const fileName = log.foto_url.split('/').pop();
+                    await supabase.storage.from(BUCKET_NAME).remove([`absensi/${fileName}`]);
+                }
+            }
+        }
+
+        // 2. PEMBERSIHAN TOTAL (Mantan Anggota)
+        // Kita ambil semua discord_id yang ada di absensi_sapd tapi TIDAK ADA di users_master
+        const { data: allAbsenIds } = await supabase.from('absensi_sapd').select('discord_id');
+        const { data: masterUsers } = await supabase.from('users_master').select('discord_id');
+        
+        if (masterUsers && allAbsenIds) {
+            const activeIds = masterUsers.map(u => u.discord_id);
+            const staleIds = [...new Set(allAbsenIds.map(a => a.discord_id).filter(id => !activeIds.includes(id)))];
+
+            for (const oldId of staleIds) {
+                console.log(`Membersihkan data permanen untuk mantan anggota: ${oldId}`);
+                
+                // Hapus sisa gambar di storage jika ada
+                const { data: oldFiles } = await supabase.from('absensi_sapd').select('foto_url').eq('discord_id', oldId);
+                if (oldFiles) {
+                    const filesToDelete = oldFiles.filter(f => f.foto_url).map(f => `absensi/${f.foto_url.split('/').pop()}`);
+                    if (filesToDelete.length > 0) await supabase.storage.from(BUCKET_NAME).remove(filesToDelete);
+                }
+
+                // Hapus dari tabel absensi
+                await supabase.from('absensi_sapd').delete().eq('discord_id', oldId);
+            }
+        }
+
+    } catch (err) {
+        console.error("Gagal pada archiveAndCleanup:", err.message);
+    }
+}
+
+// --- [BAGIAN SINKRONISASI runSapdTask TETAP SAMA] ---
+
+// 4. FUNGSI UTAMA PENGECEKAN
 async function runSapdTask() {
     console.log(`[${new Date().toLocaleString('id-ID')}] Memulai tugas rutin SAPD...`);
     
@@ -153,7 +175,7 @@ async function runSapdTask() {
     if (!guild) return console.error("Error: Server Discord tidak ditemukan!");
 
     try {
-        // --- SINKRONISASI DATA USER ---
+        // --- SINKRONISASI DATA ---
         const members = await guild.members.fetch();
         const dataToUpsert = [];
         const activeDiscordIds = [];
@@ -173,7 +195,6 @@ async function runSapdTask() {
                 activeDiscordIds.push(member.id);
                 const isUserAdmin = member.roles.cache.has(ADMIN_ROLE_ID);
 
-                // Update info di tabel absensi juga (biar sinkron)
                 updateTasks.push(
                     supabase.from('absensi_sapd').update({
                         nama_anggota: freshName,
@@ -195,30 +216,32 @@ async function runSapdTask() {
 
         await Promise.all(updateTasks);
 
+        // Jalankan Arsip & Pembersihan Berantai
+        await archiveAndCleanup(guild);
+
         if (activeDiscordIds.length > 0) {
-            await supabase.from('users_master').delete().not('discord_id', 'in', `(${activeDiscordIds.join(',')})`);
             const { error: upsertError } = await supabase.from('users_master').upsert(dataToUpsert, { onConflict: 'discord_id' });
             if (upsertError) throw upsertError;
         }
 
-        console.log("Sinkronisasi User Berhasil.");
+        console.log("Sinkronisasi Berhasil.");
 
-        // --- JALANKAN PROSES ARSIP & HAPUS STORAGE ---
-        await archiveAbsensiToForum();
-
-        // --- BROADCAST & REMINDER WIB ---
+        // --- BROADCAST & REMINDER (WIB) ---
         const now = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Jakarta"}));
         const jam = now.getHours();
         const menit = now.getMinutes();
 
         const channel = await client.channels.fetch(ANNOUNCEMENT_CHANNEL_ID);
-        if (channel && menit <= 10) {
-            if (jam === 19) {
-                await channel.send("📢 **REMINDER**\nWaktunya duty teman-teman! Segera isi absensi.\nLink: https://san-andreas-police-departement.netlify.app/ @everyone");
-                await checkMissingAbsence(channel);
-            } else if (jam === 22) {
-                await channel.send("📢 **REMINDER**\nJangan lupa mengisi kehadiran sebelum hari berganti. @everyone");
-                await checkMissingAbsence(channel);
+        if (channel) {
+            if (jam >= 19 && jam <= 23) {
+                if (jam === 19 && menit <= 10) {
+                    await channel.send("📢 **REMINDER**\nWaktunya duty teman teman... @everyone");
+                    await checkMissingAbsence(channel);
+                } 
+                else if (jam === 22 && menit <= 10) {
+                    await channel.send("📢 **REMINDER**\nJangan lupa mengisi kehadiran sebelum hari berganti. @everyone");
+                    await checkMissingAbsence(channel);
+                }
             }
         }
     } catch (err) {
@@ -226,16 +249,10 @@ async function runSapdTask() {
     }
 }
 
-// --- START BOT ---
 client.once('ready', () => {
-    console.log(`Bot SAPD Aktif sebagai ${client.user.tag}`);
+    console.log(`Bot Pengecek SAPD aktif sebagai ${client.user.tag}`);
     runSapdTask();
-    setInterval(runSapdTask, 600000); // Jalan tiap 10 menit
-});
-
-process.on('SIGTERM', () => {
-    console.log("Bot dimatikan.");
-    process.exit(0);
+    setInterval(runSapdTask, 600000); 
 });
 
 client.login(process.env.DISCORD_BOT_TOKEN);
