@@ -53,11 +53,14 @@ const REQUIRED_ROLE_ID = "1444908462067945623";
 const ADMIN_ROLE_ID = "1444910578266148897"; 
 
 // --- FUNGSI LOGS KE FORUM & HAPUS STORAGE ---
+// --- UPDATE FUNGSI FORUM LOGS DENGAN DELAY & VALIDASI ---
+
 async function processForumLogs(guild) {
     try {
         const forumChannel = await guild.channels.fetch(FORUM_CHANNEL_ID);
         if (!forumChannel || forumChannel.type !== ChannelType.GuildForum) return;
 
+        // Ambil data yang memiliki bukti_foto
         const { data: logs, error } = await supabase
             .from('absensi_sapd')
             .select('*')
@@ -65,14 +68,20 @@ async function processForumLogs(guild) {
 
         if (error || !logs || logs.length === 0) return;
 
-        console.log(`[FORUM] Ditemukan ${logs.length} data untuk diproses...`);
+        console.log(`[FORUM] Memproses ${logs.length} data secara bertahap...`);
 
-        // Menggunakan for...of agar proses berjalan berurutan (mencegah Received one or more errors)
         for (const log of logs) {
             try {
+                // 1. Validasi URL Gambar (Mencegah URL_TYPE_INVALID_URL)
+                if (!log.bukti_foto || !log.bukti_foto.startsWith('http')) {
+                    console.error(`[SKIP] Data ID ${log.id} memiliki URL foto tidak valid.`);
+                    continue; 
+                }
+
                 const statusAbsen = log.tipe_absen || "HADIR";
                 const keteranganAbsen = log.alasan || "Tidak ada keterangan";
                 
+                // 2. Cari atau Buat Thread
                 const threads = await forumChannel.threads.fetchActive();
                 let thread = threads.threads.find(t => t.name.toLowerCase() === log.nama_anggota.toLowerCase());
 
@@ -81,11 +90,14 @@ async function processForumLogs(guild) {
                         name: log.nama_anggota,
                         message: { content: `Logs Kehadiran untuk **${log.nama_anggota}**` },
                     });
+                    // Kasih jeda 2 detik setelah membuat thread baru agar Discord tidak overload
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                 }
 
-                let embedColor = 0x2ecc71;
-                if (statusAbsen === 'IZIN') embedColor = 0xf1c40f;
-                if (statusAbsen === 'CUTI') embedColor = 0xe67e22;
+                // 3. Penentuan Warna & Icon Status
+                let embedColor = 0x2ecc71; // Hijau
+                if (statusAbsen === 'IZIN') embedColor = 0xf1c40f; // Kuning
+                if (statusAbsen === 'CUTI') embedColor = 0xe67e22; // Oranye
 
                 const embed = new EmbedBuilder()
                     .setTitle(`LOG KEHADIRAN - ${statusAbsen}`)
@@ -98,12 +110,16 @@ async function processForumLogs(guild) {
                         { name: 'Alasan/Keterangan', value: keteranganAbsen, inline: false }
                     )
                     .setImage(log.bukti_foto) 
+                    .setFooter({ text: `ID Absen: ${log.id}` })
                     .setTimestamp(new Date(log.created_at));
 
-                // Kirim dan tunggu sampai selesai
+                // 4. Kirim Log ke Thread
                 await thread.send({ embeds: [embed] });
                 
-                // Proses penghapusan Storage
+                // 5. Jeda 1 detik antar pengiriman pesan (Anti Rate-Limit)
+                await new Promise(resolve => setTimeout(resolve, 1500));
+
+                // 6. Hapus Storage
                 const fileName = log.bukti_foto.split('/').pop();
                 const fullPath = `absensi/${fileName}`;
 
@@ -115,12 +131,14 @@ async function processForumLogs(guild) {
                     await supabase.from('absensi_sapd')
                         .update({ bukti_foto: null })
                         .eq('id', log.id);
-                    console.log(`[FORUM] Sukses: ${log.nama_anggota} (${statusAbsen})`);
-                } else {
-                    console.error(`[STORAGE ERROR] ${log.nama_anggota}: ${storageError.message}`);
+                    console.log(`[FORUM] Sukses: ${log.nama_anggota} [${statusAbsen}]`);
                 }
             } catch (innerError) {
                 console.error(`[PROCESS ERROR] Data ID ${log.id} gagal:`, innerError.message);
+                // Jika error karena rate limit, berhenti sejenak lebih lama
+                if (innerError.message.includes("429")) {
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                }
             }
         }
     } catch (err) {
