@@ -83,7 +83,12 @@ const allGroupIDs = [
     '1444918302508843139', // Group: Detective
     '1469596428706910292', // Group: Supervisor
     '1444910648516415488', // Group: Command Team
-    '1444910578266148897'  // Group: High Command
+    '1444910578266148897',
+    '1444921188215165141',  // Group: HIGHWAY PATROL
+    '1444920955620032533', // Group: RAMPART
+    '1444920880370159617', // Group: MERTOPOLITAN
+    '1444921352120434819', // Group: IAD
+    '1444908272363769887', // Group: HRB
 ];
 
 client.once('ready', () => {
