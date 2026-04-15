@@ -58,7 +58,7 @@ async function processForumLogs(guild) {
         const forumChannel = await guild.channels.fetch(FORUM_CHANNEL_ID);
         if (!forumChannel || forumChannel.type !== ChannelType.GuildForum) return;
 
-        // Cari data yang memiliki bukti_foto (belum diproses)
+        // Ambil data yang masih memiliki bukti_foto
         const { data: logs, error } = await supabase
             .from('absensi_sapd')
             .select('*')
@@ -67,10 +67,13 @@ async function processForumLogs(guild) {
         if (error || !logs || logs.length === 0) return;
 
         for (const log of logs) {
+            // --- PENYESUAIAN NAMA KOLOM SESUAI GAMBAR TABEL ---
+            const statusAbsen = log.tipe_absen || "HADIR"; // Menggunakan tipe_absen
+            const keteranganAbsen = log.alasan || "Tidak ada keterangan"; // Menggunakan alasan
+            
             const threads = await forumChannel.threads.fetchActive();
             let thread = threads.threads.find(t => t.name.toLowerCase() === log.nama_anggota.toLowerCase());
 
-            // Buat thread baru jika belum ada
             if (!thread) {
                 thread = await forumChannel.threads.create({
                     name: log.nama_anggota,
@@ -78,36 +81,45 @@ async function processForumLogs(guild) {
                 });
             }
 
-            // Kirim Embed ke Forum Thread
+            // Penentuan Warna berdasarkan tipe_absen
+            let embedColor = 0x2ecc71; // Hijau (Hadir)
+            if (statusAbsen === 'IZIN') embedColor = 0xf1c40f; // Kuning
+            if (statusAbsen === 'CUTI') embedColor = 0xe67e22; // Oranye
+
             const embed = new EmbedBuilder()
-                .setTitle(`LOG KEHADIRAN - ${log.status}`)
-                .setColor(log.status === 'HADIR' ? 0x2ecc71 : 0xf1c40f)
+                .setTitle(`LOG KEHADIRAN - ${statusAbsen}`)
+                .setColor(embedColor)
                 .addFields(
-                    { name: 'Pangkat', value: log.pangkat, inline: true },
-                    { name: 'Divisi', value: log.divisi, inline: true },
-                    { name: 'Keterangan', value: log.keterangan || "Tidak ada keterangan", inline: false }
+                    { name: 'Pangkat', value: log.pangkat || "-", inline: true },
+                    { name: 'Divisi', value: log.divisi || "-", inline: true },
+                    { name: 'Jam Duty', value: log.jam_duty || "-", inline: true }, // Tambahan kolom jam_duty
+                    { name: 'Kegiatan', value: log.kegiatan || "-", inline: false }, // Tambahan kolom kegiatan
+                    { name: 'Alasan/Keterangan', value: keteranganAbsen, inline: false }
                 )
-                .setImage(log.bukti_foto)
+                .setImage(log.bukti_foto) 
                 .setTimestamp(new Date(log.created_at));
 
-            await thread.send({ embeds: [embed] });
+            try {
+                // KIRIM DAN TUNGGU (Penting agar gambar ter-cache Discord sebelum dihapus)
+                await thread.send({ embeds: [embed] });
+                
+                // HAPUS STORAGE SETELAH BERHASIL TERKIRIM
+                const fileName = log.bukti_foto.split('/').pop();
+                const fullPath = `absensi/${fileName}`;
 
-            // LOGIKA HAPUS STORAGE (FOLDER absensi/)
-            const fileName = log.bukti_foto.split('/').pop();
-            const fullPath = `absensi/${fileName}`; // Path sesuai folder Anda
+                const { error: storageError } = await supabase.storage
+                    .from(STORAGE_BUCKET_NAME)
+                    .remove([fullPath]);
 
-            const { error: storageError } = await supabase.storage
-                .from(STORAGE_BUCKET_NAME)
-                .remove([fullPath]);
-
-            if (!storageError) {
-                // Update DB: set null agar tidak dikirim ulang
-                await supabase.from('absensi_sapd')
-                    .update({ bukti_foto: null })
-                    .eq('id', log.id);
-                console.log(`[FORUM] Log terkirim & storage dihapus: ${fullPath}`);
-            } else {
-                console.error(`[STORAGE ERROR] ${storageError.message}`);
+                if (!storageError) {
+                    // Update DB: Set null pada kolom bukti_foto
+                    await supabase.from('absensi_sapd')
+                        .update({ bukti_foto: null })
+                        .eq('id', log.id);
+                    console.log(`[FORUM] Sukses mengirim log untuk: ${log.nama_anggota}`);
+                }
+            } catch (sendError) {
+                console.error(`Gagal mengirim log untuk ${log.nama_anggota}:`, sendError.message);
             }
         }
     } catch (err) {
