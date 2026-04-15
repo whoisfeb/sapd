@@ -314,27 +314,63 @@ async function processForumLogs(guild) {
                 const statusKirim = log.tipe_absen || "HADIR";
                 const alasanKirim = log.alasan || "Tidak ada keterangan";
                 const namaUser = log.nama_anggota || "Unknown";
+                const discordId = log.discord_id;
 
                 const threads = await forumChannel.threads.fetchActive();
-                let targetThread = threads.threads.find(t => t.name.toLowerCase() === namaUser.toLowerCase());
+                
+                // === CARI THREAD BERDASARKAN DISCORD_ID ===
+                let targetThread = threads.threads.find(t => 
+                    t.name.includes(`[${discordId}]`)
+                );
 
                 if (!targetThread) {
-                    console.log(`[INFO] Membuat thread baru untuk ${namaUser}`);
+                    console.log(`[INFO] Membuat thread baru untuk ${namaUser} (ID: ${discordId})`);
                     targetThread = await forumChannel.threads.create({
-                        name: namaUser,
+                        name: `[${discordId}] ${namaUser}`.substring(0, 100),
                         message: { content: `Logs Kehadiran Resmi - **${namaUser}**` },
                     });
-                    // Jeda agar Discord tidak pusing
                     await new Promise(resolve => setTimeout(resolve, 3000));
+                } else {
+                    // === UPDATE NAMA THREAD JIKA ADA PERUBAHAN NAMA ===
+                    const currentName = `[${discordId}] ${namaUser}`.substring(0, 100);
+                    if (targetThread.name !== currentName) {
+                        console.log(`[INFO] Update nama thread: "${targetThread.name}" → "${currentName}"`);
+                        await targetThread.edit({ name: currentName }).catch(err => {
+                            console.warn(`[WARN] Gagal update nama thread: ${err.message}`);
+                        });
+                    }
                 }
 
-                let warnaEmbed = 0x2ecc71; // Default Hijau
+                let warnaEmbed = 0x2ecc71;
                 if (statusKirim === "IZIN") {
-                    warnaEmbed = 0xf1c40f; // Kuning
+                    warnaEmbed = 0xf1c40f;
                 } else if (statusKirim === "CUTI") {
-                    warnaEmbed = 0xe67e22; // Oranye
+                    warnaEmbed = 0xe67e22;
                 }
 
+                // === VALIDASI & EXTRACT SEMUA GAMBAR ===
+                const imageUrls = [];
+                let hasImageUrl = false;
+
+                if (log.bukti_foto && typeof log.bukti_foto === 'string') {
+                    const urls = log.bukti_foto
+                        .split(',')
+                        .map(url => url.trim())
+                        .filter(url => isValidUrl(url));
+                    
+                    imageUrls.push(...urls);
+                    hasImageUrl = true;
+                    
+                    if (imageUrls.length > 0) {
+                        console.log(`  ✓ Ditemukan ${imageUrls.length} gambar untuk ID ${log.id}`);
+                    } else {
+                        console.log(`  ⚠ URL ditemukan tapi tidak valid untuk ID ${log.id}`);
+                    }
+                } else {
+                    console.log(`  ℹ Tidak ada gambar untuk ID ${log.id}`);
+                }
+
+                // === BUAT MAIN EMBED ===
                 const reportEmbed = new EmbedBuilder()
                     .setTitle(`LOG KEHADIRAN - ${statusKirim}`)
                     .setColor(warnaEmbed)
@@ -349,55 +385,82 @@ async function processForumLogs(guild) {
                     .setTimestamp(new Date(log.created_at))
                     .setFooter({ text: "SAPD Attendance System" });
 
-                // SET GAMBAR HANYA JIKA URL VALID
-                if (log.bukti_foto && isValidUrl(log.bukti_foto)) {
-                    reportEmbed.setImage(log.bukti_foto);
-                    console.log(`  ✓ Gambar set: ${log.bukti_foto.substring(0, 50)}...`);
-                } else {
-                    // Jika tidak ada gambar atau URL tidak valid, skip - jangan tambahkan field warning
-                    if (!log.bukti_foto) {
-                        console.log(`  ℹ Tidak ada gambar untuk ID ${log.id}`);
-                    } else {
-                        console.warn(`  ⚠ URL tidak valid untuk ID ${log.id}: ${log.bukti_foto.substring(0, 50)}...`);
-                    }
+                // === TAMBAH FIELD JIKA TIDAK ADA GAMBAR ===
+                if (imageUrls.length === 0 && hasImageUrl) {
+                    reportEmbed.addFields({
+                        name: 'Bukti Gambar',
+                        value: '⚠️ File bukti tidak ditemukan di storage atau URL tidak valid.',
+                        inline: false
+                    });
+                } else if (!log.bukti_foto) {
+                    reportEmbed.addFields({
+                        name: 'Bukti Gambar',
+                        value: '⚠️ Tidak melampirkan gambar.',
+                        inline: false
+                    });
                 }
 
-                await targetThread.send({ embeds: [reportEmbed] });
-                console.log(`[SUCCESS] Log terkirim ke thread: ${namaUser}`);
+                // === BUAT ARRAY EMBEDS (MAIN + IMAGE EMBEDS) ===
+                const embeds = [reportEmbed];
 
-                // Tunggu sebentar sebelum hapus file/update
+                if (imageUrls.length > 0) {
+                    imageUrls.forEach((url, index) => {
+                        const imgEmbed = new EmbedBuilder()
+                            .setImage(url)
+                            .setColor(warnaEmbed)
+                            .setTitle(`Bukti Gambar ${index + 1}/${imageUrls.length}`)
+                            .setFooter({ text: `Image ${index + 1} dari ${imageUrls.length}` });
+                        embeds.push(imgEmbed);
+                    });
+                }
+
+                // === KIRIM SEMUA EMBEDS SEKALIGUS ===
+                try {
+                    await targetThread.send({ embeds });
+                    console.log(`[SUCCESS] Log ID ${log.id} + ${imageUrls.length} gambar terkirim ke thread: ${namaUser}`);
+                } catch (sendErr) {
+                    console.error(`  ✗ GAGAL KIRIM ID ${log.id}: ${sendErr.message}`);
+                    continue;
+                }
+
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
-                // HAPUS GAMBAR HANYA JIKA URL VALID
-                if (log.bukti_foto && isValidUrl(log.bukti_foto)) {
-                    try {
-                        const ambilNamaFile = log.bukti_foto.split('/').pop();
-                        const pathLengkap = `absensi/${ambilNamaFile}`;
-                        
-                        const { error: delError } = await supabase.storage
-                            .from(STORAGE_BUCKET_NAME)
-                            .remove([pathLengkap]);
-                        
-                        if (delError) {
-                            console.warn(`[STORAGE WARN] Gagal hapus file ${pathLengkap}: ${delError.message}`);
-                        } else {
-                            console.log(`  ✓ File storage dihapus: ${ambilNamaFile}`);
+                // === HAPUS SEMUA GAMBAR DARI STORAGE ===
+                if (imageUrls.length > 0) {
+                    for (const imageUrl of imageUrls) {
+                        try {
+                            const ambilNamaFile = imageUrl.split('/').pop();
+                            const pathLengkap = `absensi/${ambilNamaFile}`;
+                            
+                            const { error: delError } = await supabase.storage
+                                .from(STORAGE_BUCKET_NAME)
+                                .remove([pathLengkap]);
+                            
+                            if (delError) {
+                                console.warn(`  ⚠ Gagal hapus file ${ambilNamaFile}: ${delError.message}`);
+                            } else {
+                                console.log(`  ✓ File dihapus: ${ambilNamaFile}`);
+                            }
+                        } catch (storageErr) {
+                            console.warn(`  ⚠ Error hapus storage:`, storageErr.message);
                         }
-                    } catch (storageErr) {
-                        console.warn(`[STORAGE WARN] Error saat hapus file:`, storageErr.message);
                     }
                 }
 
-                // UPDATE is_archived TETAP DILAKUKAN
-                const { error: upError } = await supabase
-                    .from('absensi_sapd')
-                    .update({ is_archived: true })
-                    .eq('id', log.id);
+                // === ARCHIVE RECORD ===
+                try {
+                    const { error: upError } = await supabase
+                        .from('absensi_sapd')
+                        .update({ is_archived: true })
+                        .eq('id', log.id);
 
-                if (upError) {
-                    console.error(`[DB ERROR] Gagal update archive ID: ${log.id}: ${upError.message}`);
-                } else {
-                    console.log(`  ✓ Data ID ${log.id} di-archive`);
+                    if (upError) {
+                        console.error(`  ✗ Gagal archive ID ${log.id}: ${upError.message}`);
+                    } else {
+                        console.log(`  ✓ Data ID ${log.id} di-archive`);
+                    }
+                } catch (archiveErr) {
+                    console.error(`  ✗ Error archive ID ${log.id}: ${archiveErr.message}`);
                 }
 
             } catch (errLoop) {
