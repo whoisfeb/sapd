@@ -281,6 +281,80 @@ async function cleanupOrphanedAbsences(guild) {
     }
 }
 
+// --- FUNGSI 3: TANDAI THREAD SEBAGAI ARCHIVED UNTUK USER YANG TIDAK AKTIF ---
+async function markThreadAsArchived(guild) {
+    console.log("[ARCHIVE-THREAD] Memulai marking thread user yang tidak aktif...");
+    
+    try {
+        const forumChannel = await guild.channels.fetch(FORUM_CHANNEL_ID);
+        if (!forumChannel) {
+            console.error("[ERROR] Channel Forum tidak ditemukan.");
+            return;
+        }
+
+        // Ambil user valid dari users_master (yang masih punya role)
+        const { data: validUsers, error: fetchErr } = await supabase
+            .from('users_master')
+            .select('discord_id');
+
+        if (fetchErr) {
+            console.error("[DB ERROR]", fetchErr.message);
+            return;
+        }
+
+        const validUserIds = validUsers ? validUsers.map(u => u.discord_id) : [];
+
+        // Ambil semua thread
+        const threads = await forumChannel.threads.fetchActive();
+
+        let markedCount = 0;
+
+        for (const [, thread] of threads.threads) {
+            // Ekstrak discord ID dari nama thread
+            const idMatch = thread.name.match(/^\[(\d+)\]/);
+            
+            if (!idMatch) continue;
+
+            const discordId = idMatch[1];
+
+            try {
+                // KONDISI 1: User tidak ada di users_master
+                const userInDb = validUserIds.includes(discordId);
+
+                // KONDISI 2: User tidak ada di Discord atau tidak punya required role
+                const member = await guild.members.fetch(discordId).catch(() => null);
+                const userInDiscord = member ? member.roles.cache.has(REQUIRED_ROLE_ID) : false;
+
+                // Jika TIDAK ada di DB ATAU TIDAK punya required role → tandai archived
+                if (!userInDb || !userInDiscord) {
+                    if (!thread.name.includes('[ARCHIVED]')) {
+                        const newName = `[ARCHIVED] ${thread.name}`.substring(0, 100);
+                        
+                        const reason = !userInDb ? "tidak ada di users_master" : "tidak punya required role";
+                        console.log(`[ARCHIVE-THREAD] Tandai thread (${reason}): "${thread.name}" → "${newName}"`);
+                        
+                        try {
+                            await thread.edit({ name: newName });
+                            markedCount++;
+                        } catch (err) {
+                            console.warn(`[WARN] Gagal update thread: ${err.message}`);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error(`[ERROR] Gagal proses thread: ${err.message}`);
+            }
+
+            // Jeda untuk avoid rate limit
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+
+        console.log(`[ARCHIVE-THREAD] Selesai. Total thread di-archive: ${markedCount}`);
+    } catch (err) {
+        console.error("[CRITICAL ERROR] markThreadAsArchived:", err.message);
+    }
+}
+
 // --- FUNGSI UNTUK PROSES FORUM LOGS ---
 async function processForumLogs(guild) {
     console.log("[DEBUG] Memulai proses pengecekan forum logs...");
@@ -518,6 +592,10 @@ async function runSapdTask() {
         await cleanupUsersWithoutRole(serverGuild);
         await new Promise(resolve => setTimeout(resolve, 1000));
         await cleanupOrphanedAbsences(serverGuild);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // --- PHASE 1B: TANDAI THREAD SEBAGAI ARCHIVED ---
+        await markThreadAsArchived(serverGuild);
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         // --- PHASE 2: SINKRONISASI DATA BARU ---
