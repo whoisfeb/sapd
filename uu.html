@@ -64,8 +64,8 @@
 </head>
 <body>
 
-    <nav class="sidebar" id="sidebar-nav">
-        </nav>
+    <!-- Sidebar akan diisi oleh window.menuHTML -->
+    <nav class="sidebar" id="sidebar-nav"></nav>
 
     <main class="main">
         <article class="document">
@@ -74,10 +74,35 @@
                 <h2>UNDANG-UNDANG INTERNAL KEPOLISIAN TAHUN 2026</h2>
             </header>
 
+            <!-- Konten utama akan diisi oleh window.kodeHTML -->
             <div id="isi-hukum-otomatis"></div>
         </article>
     </main>
 
+    <!-- Memanggil data eksternal -->
     <script src="uu.js"></script>
+
+    <!-- Logika untuk merender data -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const sidebarContainer = document.getElementById('sidebar-nav');
+            const contentContainer = document.getElementById('isi-hukum-otomatis');
+
+            // Cek apakah variabel dari uu.js tersedia
+            if (typeof window.menuHTML !== 'undefined' && typeof window.kodeHTML !== 'undefined') {
+                sidebarContainer.innerHTML = window.menuHTML;
+                contentContainer.innerHTML = window.kodeHTML;
+                console.log("Data UU Berhasil Dimuat");
+            } else {
+                contentContainer.innerHTML = `
+                    <div style="color: red; padding: 20px; border: 1px dashed red;">
+                        <strong>Error:</strong> Data dari uu.js tidak ditemukan.<br>
+                        Pastikan file <b>uu.js</b> ada di folder yang sama dan variabel 
+                        <i>window.menuHTML</i> serta <i>window.kodeHTML</i> sudah didefinisikan.
+                    </div>
+                `;
+            }
+        });
+    </script>
 </body>
 </html>
