@@ -4,13 +4,9 @@ const {
     GatewayIntentBits, 
     EmbedBuilder, 
     ChannelType, 
-    Partials,
-    AttachmentBuilder
+    Partials 
 } = require('discord.js');
 const { createClient } = require('@supabase/supabase-js');
-const fs = require('fs');
-const https = require('https');
-const path = require('path');
 
 // --- KONFIGURASI SUPABASE ---
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -85,66 +81,6 @@ function isValidUrl(url) {
     } catch (e) {
         return false;
     }
-}
-
-// --- FUNGSI DOWNLOAD GAMBAR ---
-async function downloadImage(imageUrl) {
-    return new Promise((resolve, reject) => {
-        try {
-            // Buat folder temp jika belum ada
-            if (!fs.existsSync('./temp')) {
-                fs.mkdirSync('./temp');
-            }
-
-            const filename = `temp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}.jpg`;
-            const filepath = path.join(__dirname, 'temp', filename);
-            
-            const file = fs.createWriteStream(filepath);
-            
-            https.get(imageUrl, { timeout: 10000 }, (response) => {
-                // Cek status code
-                if (response.statusCode !== 200) {
-                    file.destroy();
-                    fs.unlink(filepath, () => {});
-                    reject(new Error(`HTTP ${response.statusCode}`));
-                    return;
-                }
-
-                response.pipe(file);
-                
-                file.on('finish', () => {
-                    file.close();
-                    resolve(filepath);
-                });
-
-                file.on('error', (err) => {
-                    file.destroy();
-                    fs.unlink(filepath, () => {});
-                    reject(err);
-                });
-            }).on('error', (err) => {
-                fs.unlink(filepath, () => {});
-                reject(err);
-            }).on('timeout', () => {
-                file.destroy();
-                fs.unlink(filepath, () => {});
-                reject(new Error('Download timeout'));
-            });
-        } catch (err) {
-            reject(err);
-        }
-    });
-}
-
-// --- FUNGSI CLEANUP TEMP FILES ---
-function cleanupTempFiles(tempFiles) {
-    tempFiles.forEach(tempFile => {
-        fs.unlink(tempFile, (err) => {
-            if (err && err.code !== 'ENOENT') {
-                console.warn(`[WARN] Gagal hapus temp file ${tempFile}: ${err.message}`);
-            }
-        });
-    });
 }
 
 // --- FUNGSI 1: CLEANUP USER YANG TIDAK PUNYA REQUIRED ROLE DARI USERS_MASTER ---
@@ -419,7 +355,7 @@ async function markThreadAsArchived(guild) {
     }
 }
 
-// --- FUNGSI UNTUK PROSES FORUM LOGS (UPDATED) ---
+// --- FUNGSI UNTUK PROSES FORUM LOGS ---
 async function processForumLogs(guild) {
     console.log("[DEBUG] Memulai proses pengecekan forum logs...");
     
@@ -447,7 +383,6 @@ async function processForumLogs(guild) {
 
         for (let i = 0; i < logs.length; i++) {
             const log = logs[i];
-            const tempFilesToCleanup = [];
             
             try {
                 const statusKirim = log.tipe_absen || "HADIR";
@@ -480,11 +415,11 @@ async function processForumLogs(guild) {
                     }
                 }
 
-                let warnaEmbed = 0x2ecc71; // Hijau (HADIR)
+                let warnaEmbed = 0x2ecc71;
                 if (statusKirim === "IZIN") {
-                    warnaEmbed = 0xf1c40f; // Kuning (IZIN)
+                    warnaEmbed = 0xf1c40f;
                 } else if (statusKirim === "CUTI") {
-                    warnaEmbed = 0xe67e22; // Orange (CUTI)
+                    warnaEmbed = 0xe67e22;
                 }
 
                 // === VALIDASI & EXTRACT SEMUA GAMBAR ===
@@ -539,54 +474,33 @@ async function processForumLogs(guild) {
                     });
                 }
 
-                // === DOWNLOAD & SIAPKAN FILES ===
-                const attachments = [];
+                // === BUAT ARRAY EMBEDS (MAIN + IMAGE EMBEDS) ===
+                const embeds = [reportEmbed];
+
                 if (imageUrls.length > 0) {
-                    console.log(`[DOWNLOAD] Mulai download ${imageUrls.length} gambar untuk log ID ${log.id}...`);
-                    
-                    for (let imgIndex = 0; imgIndex < imageUrls.length; imgIndex++) {
-                        const imageUrl = imageUrls[imgIndex];
-                        try {
-                            const tempPath = await downloadImage(imageUrl);
-                            tempFilesToCleanup.push(tempPath);
-                            
-                            // Buat attachment untuk Discord
-                            const filename = `bukti_${log.id}_${imgIndex + 1}.jpg`;
-                            const attachment = new AttachmentBuilder(tempPath, { name: filename });
-                            attachments.push(attachment);
-                            
-                            console.log(`  ✓ Download gambar ${imgIndex + 1}/${imageUrls.length}`);
-                        } catch (downloadErr) {
-                            console.warn(`  ⚠ Gagal download gambar ${imgIndex + 1}: ${downloadErr.message}`);
-                        }
-                    }
+                    imageUrls.forEach((url, index) => {
+                        const imgEmbed = new EmbedBuilder()
+                            .setImage(url)
+                            .setColor(warnaEmbed)
+                            .setTitle(`Bukti Gambar ${index + 1}/${imageUrls.length}`)
+                            .setFooter({ text: `Image ${index + 1} dari ${imageUrls.length}` });
+                        embeds.push(imgEmbed);
+                    });
                 }
 
-                // === KIRIM KE DISCORD ===
+                // === KIRIM SEMUA EMBEDS SEKALIGUS ===
                 try {
-                    if (attachments.length > 0) {
-                        await targetThread.send({ 
-                            embeds: [reportEmbed],
-                            files: attachments
-                        });
-                        console.log(`[SUCCESS] Log ID ${log.id} + ${attachments.length} gambar terkirim ke thread: ${namaUser}`);
-                    } else {
-                        await targetThread.send({ 
-                            embeds: [reportEmbed]
-                        });
-                        console.log(`[SUCCESS] Log ID ${log.id} (tanpa gambar) terkirim ke thread: ${namaUser}`);
-                    }
+                    await targetThread.send({ embeds });
+                    console.log(`[SUCCESS] Log ID ${log.id} + ${imageUrls.length} gambar terkirim ke thread: ${namaUser}`);
                 } catch (sendErr) {
                     console.error(`  ✗ GAGAL KIRIM ID ${log.id}: ${sendErr.message}`);
-                    cleanupTempFiles(tempFilesToCleanup);
                     continue;
                 }
 
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
-                // === HAPUS GAMBAR DARI STORAGE (SETELAH BERHASIL KIRIM) ===
+                // === HAPUS SEMUA GAMBAR DARI STORAGE ===
                 if (imageUrls.length > 0) {
-                    console.log(`[CLEANUP] Mulai hapus ${imageUrls.length} gambar dari storage...`);
                     for (const imageUrl of imageUrls) {
                         try {
                             const ambilNamaFile = imageUrl.split('/').pop();
@@ -599,17 +513,13 @@ async function processForumLogs(guild) {
                             if (delError) {
                                 console.warn(`  ⚠ Gagal hapus file ${ambilNamaFile}: ${delError.message}`);
                             } else {
-                                console.log(`  ✓ File dihapus dari storage: ${ambilNamaFile}`);
+                                console.log(`  ✓ File dihapus: ${ambilNamaFile}`);
                             }
                         } catch (storageErr) {
                             console.warn(`  ⚠ Error hapus storage:`, storageErr.message);
                         }
                     }
                 }
-
-                // === CLEANUP TEMP FILES LOKAL ===
-                cleanupTempFiles(tempFilesToCleanup);
-                tempFilesToCleanup.length = 0;
 
                 // === ARCHIVE RECORD ===
                 try {
@@ -629,7 +539,6 @@ async function processForumLogs(guild) {
 
             } catch (errLoop) {
                 console.error(`[LOOP ERROR] Gagal memproses data ID ${log.id}:`, errLoop.message);
-                cleanupTempFiles(tempFilesToCleanup);
             }
         }
         
