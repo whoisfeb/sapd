@@ -10,7 +10,7 @@
     "axios": "^1.6.0"
   },
   "scripts": {
-    "start": "node bot-sapd.js & node sapd-discord.js",
+    "start": "node bot-sapd.js & node sapd-discord.js & node surat.js",
     "build": "echo 'No build step required'"
   }
 }
