@@ -53,6 +53,7 @@ const rankPrefixes = {
 // --- 2. MAPPING ROLE KELOMPOK (GROUPS) ---
 // ==========================================
 const groupRoles = {
+
     '1444919938891649145': '1444918351037206570', // Group: Police Officer
     '1444920044239982673': '1444918351037206570',
     '1444920144793964595': '1444918351037206570',
@@ -75,6 +76,17 @@ const groupRoles = {
 };
 
 // ==========================================
+// --- ROLE GOLOGAN SAJA (UNTUK SINKRONISASI)
+// ==========================================
+const groupRoleIDs = [
+    '1444918351037206570', // Group: Police Officer
+    '1444918302508843139', // Group: Detective
+    '1469596428706910292', // Group: Supervisor
+    '1444910648516415488', // Group: Command Team
+    '1444910578266148897', // Group: High Command
+];
+
+// ==========================================
 // --- 3. DAFTAR MEMBERSIHKAN ROLE POLISI ---
 // ==========================================
 const allGroupIDs = [
@@ -83,7 +95,7 @@ const allGroupIDs = [
     '1444918302508843139', // Group: Detective
     '1469596428706910292', // Group: Supervisor
     '1444910648516415488', // Group: Command Team
-    '1444910578266148897',
+    '1444910578266148897', // Group: High Command
     '1444921188215165141',  // Group: HIGHWAY PATROL
     '1444920955620032533', // Group: RAMPART
     '1444920880370159617', // Group: MERTOPOLITAN
@@ -91,135 +103,391 @@ const allGroupIDs = [
     '1444908272363769887', // Group: HRB
 ];
 
-client.once('ready', () => {
-    console.log(`Bot login sebagai ${client.user.tag}`);
-    const notifChannel = client.channels.cache.get(NOTIF_CHANNEL_ID);
-    if (notifChannel) {
-        notifChannel.send(`✅ **Sistem SAPD Online** | ${new Date().toLocaleString('id-ID')} | Status: Menunggu Promosi/Demotion... \n\n*Bot ini akan otomatis memproses promosi/demotion berdasarkan format yang ditentukan di channel promosi.*\n*Pastikan format benar agar bot dapat memproses dengan lancar.*\n*Ketika tidak ada aktivitas yang sesuai format di channel <#1444904948692422756> maka bot akan offline.*\n@everyone`)
-        .catch(console.error);
-    }
-});
+// ==========================================
+// --- HELPER FUNCTIONS ---
+// ==========================================
 
-client.on('messageCreate', async (message) => {
-    if (message.author.bot || message.channel.id !== PROMOTION_CHANNEL_ID) return;
-
-    const isPromotion = message.content.includes('**PROMOTION**');
-    const isDemotion = message.content.includes('**DEMOTION**');
-
-    if (isPromotion || isDemotion) {
-        const nameLine = message.content.match(/Name:\s*(.*)/i);
-        const userMatches = nameLine ? nameLine[1].match(/<@!?(\d+)>/g) : null;
-        const prevRankMatch = message.content.match(/Previous Rank:\s*<@&(\d+)>/i);
-        const newRankMatch = message.content.match(/Rank to be (?:promoted|demoted):\s*<@&(\d+)>/i);
-        
-        const prevDivLine = message.content.match(/Previous Division\s*:\s*(.*)/i);
-        const prevDivs = prevDivLine ? prevDivLine[1].match(/<@&(\d+)>/g) : null;
-        
-        const newDivLine = message.content.match(/(?:Moved to this division|Moved to this\s+division)\s*:?\s*(.*)/i);
-        const newDivs = newDivLine ? newDivLine[1].match(/<@&(\d+)>/g) : null;
-
-        if (!userMatches) return;
-
-        for (const mention of userMatches) {
-            const userID = mention.replace(/[<@!>]/g, '');
-            try {
-                const member = await message.guild.members.fetch(userID);
-                const botMember = message.guild.members.me;
-
-                // PROTEKSI HIERARKI: Bot tidak bisa ubah member yang rolenya lebih tinggi dari bot
-                if (member.roles.highest.position >= botMember.roles.highest.position) {
-                    console.warn(`[SKIP] Role ${member.user.tag} terlalu tinggi untuk Bot.`);
-                    continue;
-                }
-
-                const newRankID = newRankMatch ? newRankMatch[1] : null;
-
-                // --- PROSES KELUAR POLISI (DEMOTE KE WARGA) ---
-                if (newRankID === WARGA_ROLE_ID) {
-                    // 1. Cabut Pangkat Terakhir
-                    if (prevRankMatch) await member.roles.remove(prevRankMatch[1]).catch(() => null);
-                    
-                    // 2. Cabut Semua Role Kelompok (Termasuk Excellence Police)
-                    for (const groupID of allGroupIDs) {
-                        if (member.roles.cache.has(groupID)) {
-                            await member.roles.remove(groupID).catch(e => console.error(`Gagal cabut group ${groupID}: ${e.message}`));
-                        }
-                    }
-
-                    // 3. Cabut Divisi
-                    if (prevDivs) {
-                        for (const div of prevDivs) await member.roles.remove(div.replace(/[<@&>]/g, '')).catch(() => null);
-                    }
-
-                    // 4. Tambah Warga Excellence & Reset Nickname ke Civil
-                    await member.roles.add(WARGA_ROLE_ID).catch(console.error);
-                    
-                    let cleanName = member.displayName;
-                    if (cleanName.includes('|')) cleanName = cleanName.split('|')[1].trim();
-                    const newNickname = `Civil | ${cleanName}`.substring(0, 32);
-                    await member.setNickname(newNickname).catch(() => null);
-                } 
-                // --- PROSES POLISI NORMAL (PROMOSI/DEMOSI PANGKAT) ---
-                else {
-                    if (prevRankMatch) await member.roles.remove(prevRankMatch[1]).catch(() => null);
-                    if (newRankID) await member.roles.add(newRankID).catch(console.error);
-
-                    if (prevDivs) {
-                        for (const div of prevDivs) await member.roles.remove(div.replace(/[<@&>]/g, '')).catch(() => null);
-                    }
-                    if (newDivs) {
-                        for (const div of newDivs) await member.roles.add(div.replace(/[<@&>]/g, '')).catch(console.error);
-                    }
-
-                    // Sinkronisasi Role Kelompok
-                    if (newRankID && groupRoles[newRankID]) {
-                        const targetGroupID = groupRoles[newRankID];
-                        for (const groupID of allGroupIDs) {
-                            // Jangan cabut Role Inti (Excellence Police) saat update pangkat biasa
-                            if (member.roles.cache.has(groupID) && groupID !== targetGroupID && groupID !== POLICE_MAIN_ROLE_ID) {
-                                await member.roles.remove(groupID).catch(() => null);
-                            }
-                        }
-                        await member.roles.add(targetGroupID).catch(console.error);
-                    }
-
-                    // Update Prefix Nickname
-                    if (newRankID && rankPrefixes[newRankID]) {
-                        const prefix = rankPrefixes[newRankID];
-                        let cleanName = member.displayName;
-                        if (cleanName.includes('|')) cleanName = cleanName.split('|')[1].trim();
-                        const newNickname = `${prefix} | ${cleanName}`.substring(0, 32);
-                        await member.setNickname(newNickname).catch(() => null);
-                    }
-                }
-                console.log(`Berhasil memproses ${member.user.tag}`);
-            } catch (error) {
-                console.error(`Gagal memproses ID ${userID}:`, error);
-            }
-        }
-        await message.react('✅');
-    }
-});
-
-async function sendOfflineNotif() {
-    const notifChannel = client.channels.cache.get(NOTIF_CHANNEL_ID);
-    if (notifChannel) {
-        try {
-            await notifChannel.send(`⚠️ **Sistem SAPD Offline**\n\n*Silahkan tunggu sistem SAPD online kembali\n\n@everyone | ${new Date().toLocaleString('id-ID')} | Status: Berhenti/Timeout. \n*Bot akan aktif kembali otomatis sesuai jadwal atau jika dijalankan manual.*`);
-        } catch (err) {
-            console.error("Gagal mengirim pesan offline:", err);
-        }
-    }
+function extractUserID(text) {
+    if (!text) return null;
+    const match = text.match(/<@!?(\d+)>/);
+    return match ? match[1] : null;
 }
 
-process.on('SIGTERM', async () => {
-    await sendOfflineNotif();
-    process.exit(0);
+function extractRoleIDs(text) {
+    if (!text) return [];
+
+    const roleIDArray = [];
+    const regex = /<@&(\d+)>/g;
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+        roleIDArray.push(match[1]);
+    }
+
+    return roleIDArray;
+}
+
+function extractRoleID(text) {
+    const ids = extractRoleIDs(text);
+    return ids.length > 0 ? ids[0] : null;
+}
+
+function isEmpty(value) {
+    if (!value) return true;
+    const cleaned = value.trim().toLowerCase();
+    return cleaned === '-' || cleaned === 'n/a' || cleaned === 'na' || cleaned === '';
+}
+
+// ==========================================
+// --- PARSE PROMOTION LETTER ---
+// ==========================================
+function parsePromotionLetter(messageContent) {
+
+    const pihakTerkaitStart = messageContent.indexOf('Pihak Terkait');
+    if (pihakTerkaitStart === -1) return null;
+
+    const after = messageContent.substring(pihakTerkaitStart);
+    const next = after.indexOf('Bersama ini saya membuat');
+
+    const content = next !== -1 ? after.substring(0, next) : after;
+
+    const namaMatch = content.match(/a\.\s*Nama\s*:\s*(.+?)(?=\nb\.|$)/is);
+    const pangkatLamaMatch = content.match(/b\.\s*Pangkat\s+Lama\s*:\s*(.+?)(?=\nc\.|$)/is);
+    const pangkatBaruMatch = content.match(/c\.\s*Pangkat\s+Baru\s*:\s*(.+?)(?=\nd\.|$)/is);
+    const jabatanLamaMatch = content.match(/d\.\s*Jabatan\s+Lama\s*:\s*(.+?)(?=\ne\.|$)/is);
+    const jabatanBaruMatch = content.match(/e\.\s*Jabatan\s+Baru\s*:\s*(.+?)(?=\nf\.|$)/is);
+    const satuanLamaMatch = content.match(/f\.\s*Satuan\s+Lama\s*:\s*(.+?)(?=\ng\.|$)/is);
+    const satuanBaruMatch = content.match(/g\.\s*Satuan\s+Baru\s*:\s*(.+?)(?=\nh\.|$)/is);
+    const statusMatch = content.match(/h\.\s*Status\s*:\s*(.+)/i);
+
+    const nama = namaMatch ? namaMatch[1].trim() : null;
+    const userID = nama ? extractUserID(nama) : null;
+
+    if (!userID) return null;
+
+    return {
+        userID,
+        pangkatLama: isEmpty(pangkatLamaMatch?.[1]) ? null : pangkatLamaMatch[1].trim(),
+        pangkatBaru: isEmpty(pangkatBaruMatch?.[1]) ? null : pangkatBaruMatch[1].trim(),
+        jabatanLama: isEmpty(jabatanLamaMatch?.[1]) ? null : jabatanLamaMatch[1].trim(),
+        jabatanBaru: isEmpty(jabatanBaruMatch?.[1]) ? null : jabatanBaruMatch[1].trim(),
+        satuanLama: isEmpty(satuanLamaMatch?.[1]) ? null : satuanLamaMatch[1].trim(),
+        satuanBaru: isEmpty(satuanBaruMatch?.[1]) ? null : satuanBaruMatch[1].trim(),
+        status: isEmpty(statusMatch?.[1]) ? null : statusMatch[1].trim().toUpperCase()
+    };
+}
+
+// ==========================================
+// --- BOT READY ---
+// ==========================================
+client.once('clientReady', async () => {
+
+    console.log(`✅ Bot login sebagai ${client.user.tag}`);
+
+    const notifChannel = client.channels.cache.get(NOTIF_CHANNEL_ID);
+    if (!notifChannel) return;
+
+    // PESAN 1
+    await notifChannel.send(`✅ **Sistem SAPD Online** | ${new Date().toLocaleString('id-ID')}
+Status: **Menunggu Promosi/Demotion...**
+
+*Bot ini akan otomatis memproses promosi/demotion berdasarkan format surat resmi yang ditentukan di channel promosi.*
+*Pastikan format surat benar agar bot dapat memproses dengan lancar.*
+*Ketika tidak ada aktivitas yang sesuai format di channel <#${PROMOTION_CHANNEL_ID}> maka bot akan standby.*
+
+@everyone
+
+━━━━━━━━━━━━━━━━━━━━
+📑 **Tutorial Mengisi Format Promotion**
+━━━━━━━━━━━━━━━━━━━━
+
+Gunakan format berikut:
+
+**SURAT PROMOSI, DEMOSI, ROTASI**
+
+27/01/2026 19:05PM
+Klasifikasi: Rahasia
+Lampiran Satu Lembar
+Perihal : Promosi/Demosi/Rotasi
+
+Dengan Hormat,
+
+Yang bertanda tangan dibawah ini :
+a. Nama     :
+b. Pangkat  :
+c. Jabatan  :
+d. Satuan :
+
+Pihak Terkait
+Biro Sumber Daya Manusia
+a. Nama         :
+b. Pangkat Lama :
+c. Pangkat Baru :
+d. Jabatan Lama :
+e. Jabatan Baru :
+f. Satuan Lama :
+g. Satuan Baru :
+h. Status :
+Bersama ini saya membuat surat secara
+resmi dan sah, sesuai Peraturan Kepolisian Daerah, dengan pertimbangan sebagai berikut :
+
+<@&1496865881672912899>
+`);
+
+    // PESAN 2
+    await notifChannel.send(`━━━━━━━━━━━━━━━━━━━━
+📌 **Contoh Pengisian**
+━━━━━━━━━━━━━━━━━━━━
+
+**SURAT PROMOSI, DEMOSI, ROTASI**
+
+27/01/2026 19:05PM
+Klasifikasi: Rahasia
+Lampiran Satu Lembar
+Perihal : Promosi/Demosi/Rotasi (pilih salah satunya)
+
+Dengan Hormat,
+
+Yang bertanda tangan dibawah ini :
+a. Nama     : isi nama anda disini
+b. Pangkat  : isi pangkat anda
+c. Jabatan  : isi jabatan anda
+d. Satuan : isi satuan atau divisi anda
+
+Pihak Terkait
+Biro Sumber Daya Manusia
+a. Nama         : tag user yang bersangkutan
+b. Pangkat Lama : tag pangkat lama (jika ada, jika tidak ada isi dengan -)
+c. Pangkat Baru : tag pangkat baru (jika ada, jika tidak ada isi dengan -)
+d. Jabatan Lama : tag jabatan lama (jika ada, jika tidak ada isi dengan -)
+e. Jabatan Baru : tag jabatan baru (jika ada, jika tidak ada isi dengan -)
+f. Satuan Lama : tag satuan lama (jika ada, jika tidak ada isi dengan -)
+g. Satuan Baru : tag satuan baru (jika ada, jika tidak ada isi dengan -)
+h. Status : tag status (PROMOSI / DEMOSI / ROTASI / RESIGN / PTDH)
+
+Bersama ini saya membuat surat secara
+resmi dan sah, sesuai Peraturan Kepolisian Daerah, dengan pertimbangan sebagai berikut :
+
+<@&1496865881672912899>
+`);
+
+    // PESAN 3
+    await notifChannel.send(`contoh pengisian PTDH ATAU RESIGN
+
+**SURAT PROMOSI, DEMOSI, ROTASI**
+
+27/01/2026 19:05PM
+Klasifikasi: Rahasia
+Lampiran Satu Lembar
+Perihal : Promosi/Demosi/Rotasi (pilih salah satunya)
+
+Dengan Hormat,
+
+Yang bertanda tangan dibawah ini :
+a. Nama     : isi nama anda disini
+b. Pangkat  : isi pangkat anda
+c. Jabatan  : isi jabatan anda
+d. Satuan : isi satuan atau divisi anda
+
+Pihak Terkait
+Biro Sumber Daya Manusia
+a. Nama         : tag user yang bersangkutan
+b. Pangkat Lama : tag pangkat lama
+c. Pangkat Baru : isi dengan tanda -
+d. Jabatan Lama : tag jabatan lama
+e. Jabatan Baru : isi dengan tanda -
+f. Satuan Lama : tag satuan lama
+g. Satuan Baru : isi dengan tanda -
+h. Status : PTDH atau RESIGN (pilih salah satunya)
+
+Bersama ini saya membuat surat secara
+resmi dan sah, sesuai Peraturan Kepolisian Daerah, dengan pertimbangan sebagai berikut :
+
+<@&1496865881672912899>
+
+⚠️ **Catatan:**
+• Gunakan **mention user** untuk nama
+• Gunakan **mention role** untuk pangkat/jabatan/satuan
+• Jika tidak ada perubahan isi dengan **-**
+
+━━━━━━━━━━━━━━━━━━━━
+🤖 **Sistem akan otomatis:**
+• Menghapus pangkat lama
+• Memberikan pangkat baru
+• Mengubah divisi/satuan
+• Menyesuaikan golongan
+• Mengubah nickname sesuai pangkat
+━━━━━━━━━━━━━━━━━━━━
+`);
+
 });
 
-process.on('SIGINT', async () => {
-    await sendOfflineNotif();
-    process.exit(0);
+// ==========================================
+// --- PROMOTION SYSTEM ---
+// ==========================================
+client.on('messageCreate', async (message) => {
+
+    if (message.author.bot && message.author.id !== client.user.id) return;
+    if (message.channel.id !== PROMOTION_CHANNEL_ID) return;
+
+    if (!message.content.includes('Pihak Terkait')) return;
+
+    const data = parsePromotionLetter(message.content);
+
+    if (!data) {
+        await message.react('❌');
+        return;
+    }
+
+    const { userID, pangkatLama, pangkatBaru, satuanLama, satuanBaru, status } = data;
+
+    try {
+
+        const member = await message.guild.members.fetch(userID);
+        const botMember = message.guild.members.me;
+
+        if (member.roles.highest.position >= botMember.roles.highest.position) {
+            await message.react('⚠️');
+            return;
+        }
+
+        // ======================================
+        // PTDH / RESIGN SYSTEM (FULL REMOVE)
+        // ======================================
+        if (status === 'PTDH' || status === 'RESIGN') {
+
+            const member = await message.guild.members.fetch(userID);
+
+            // Hapus semua role polisi
+            for (const roleID of allGroupIDs) {
+                if (member.roles.cache.has(roleID)) {
+                    await member.roles.remove(roleID).catch(()=>null);
+                }
+            }
+
+            // Hapus pangkat jika ada
+            if (pangkatLama) {
+                const roleID = extractRoleID(pangkatLama);
+                if (roleID) await member.roles.remove(roleID).catch(()=>null);
+            }
+
+            // Tambahkan role warga
+            if (!member.roles.cache.has(WARGA_ROLE_ID)) {
+                await member.roles.add(WARGA_ROLE_ID).catch(()=>null);
+            }
+
+            // =========================
+            // NICKNAME PTDH / RESIGN
+            // =========================
+            let clean = member.displayName || member.user.username;
+
+            if (clean.includes('|')) {
+                clean = clean.split('|')[1].trim();
+            }
+
+            let newName = clean;
+
+            if (status === 'RESIGN') {
+                newName = `RESIGN | ${clean}`;
+            }
+
+            if (status === 'PTDH') {
+                newName = `PTDH | ${clean}`;
+            }
+
+            await member.setNickname(newName.substring(0,32)).catch(()=>null);
+
+            await message.react('🔥');
+
+            return;
+        }
+
+        // REMOVE OLD RANK
+        if (pangkatLama) {
+
+            const roleID = extractRoleID(pangkatLama);
+
+            if (roleID) await member.roles.remove(roleID).catch(() => null);
+
+        }
+
+        // ADD NEW RANK
+        let newRankID = null;
+
+        if (pangkatBaru) {
+
+            newRankID = extractRoleID(pangkatBaru);
+
+            if (newRankID) await member.roles.add(newRankID);
+
+        }
+
+        // REMOVE OLD DIVISION
+        if (satuanLama) {
+
+            const roles = extractRoleIDs(satuanLama);
+
+            for (const r of roles) await member.roles.remove(r).catch(()=>null);
+
+        }
+
+        // ADD NEW DIVISION
+        if (satuanBaru) {
+
+            const roles = extractRoleIDs(satuanBaru);
+
+            for (const r of roles) await member.roles.add(r).catch(()=>null);
+
+        }
+
+        // ======================================
+        // SYNC GROUP ROLE (FIXED)
+        // ======================================
+        if (newRankID && groupRoles[newRankID]) {
+
+            const targetGroupID = groupRoles[newRankID];
+
+            for (const groupID of groupRoleIDs) {
+
+                if (member.roles.cache.has(groupID) && groupID !== targetGroupID) {
+
+                    await member.roles.remove(groupID).catch(()=>null);
+
+                }
+
+            }
+
+            await member.roles.add(targetGroupID);
+
+        }
+
+        if (newRankID) await member.roles.add(POLICE_MAIN_ROLE_ID);
+
+        // UPDATE NICKNAME
+        if (newRankID && rankPrefixes[newRankID]) {
+
+            const prefix = rankPrefixes[newRankID];
+
+            let clean = member.displayName;
+
+            if (clean.includes('|')) clean = clean.split('|')[1].trim();
+
+            await member.setNickname(`${prefix} | ${clean}`.substring(0,32));
+
+        }
+
+        await message.react('✅');
+
+    } catch (err) {
+
+        console.error(err);
+        await message.react('❌');
+
+    }
+
 });
 
+// ==========================================
+// --- BOT LOGIN ---
+// ==========================================
 client.login(TOKEN);
