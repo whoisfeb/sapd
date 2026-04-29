@@ -9,19 +9,27 @@ exports.handler = async (event) => {
     }
 
     const { discordId } = JSON.parse(event.body);
-    const ADMIN_ROLE_ID = "1444910578266148897"; // Ganti dengan ID Role Admin kamu
+    
+    // 1. Ganti menjadi array untuk menampung banyak ID Admin
+    const ADMIN_ROLE_IDS = [
+        "1497996042518663363",
+        "1444910578266148897", 
+        "1444925161416425503", 
+        "1444925095364657323"
+    ];
 
     try {
-        // 1. Ambil data member langsung dari Discord API
         const memberRes = await axios.get(
             `https://discord.com/api/v10/guilds/${process.env.DISCORD_GUILD_ID}/members/${discordId}`,
             { headers: { Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}` } }
         );
 
         const { roles } = memberRes.data;
-        const freshIsAdmin = roles.includes(ADMIN_ROLE_ID);
 
-        // 2. Update status di Database agar sinkron
+        // 2. Gunakan .some() untuk mengecek apakah salah satu role user ada di daftar admin
+        const freshIsAdmin = roles.some(roleId => ADMIN_ROLE_IDS.includes(roleId));
+
+        // Update status di Database
         await supabase.from('users_master')
             .update({ is_admin: freshIsAdmin })
             .eq('discord_id', discordId);
@@ -39,7 +47,6 @@ exports.handler = async (event) => {
         };
 
     } catch (err) {
-        // Jika user tidak ditemukan di discord (sudah keluar/dikick)
         if (err.response && err.response.status === 404) {
             await supabase.from('users_master').delete().eq('discord_id', discordId);
             return { statusCode: 403, body: JSON.stringify({ message: "KICKED" }) };
