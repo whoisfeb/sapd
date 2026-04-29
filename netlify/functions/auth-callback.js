@@ -46,12 +46,14 @@ exports.handler = async (event) => {
             
             return {
                 statusCode: 403,
-                body: "AKSES DITOLAK: Anda tidak memiliki Role SAPD di Discord."
+                body: "AKSES DITOLAK: Anda tidak memiliki Role kepolisian di Discord."
             };
         }
 
         // --- MAPPING PANGKAT & DIVISI ---
         const PANGKAT_MAP = {
+            "1499035567135133816": "COMMISSIONNER",
+            "1499035667496177836": "DEPUTY COMMISSIONNER",
             "1444909938001580257": "CHIEF OF POLICE",
             "1444909771181522974": "ASSISTANT CHIEF OF POLICE",
             "1444909625475596349": "DEPUTY CHIEF OF POLICE",
@@ -82,10 +84,19 @@ exports.handler = async (event) => {
             "1444921352120434819": "INTERNAL AFFAIRS DIVISION"
         };
 
+
         let userPangkat = "Unknown";
         let userDivisi = "-";
-        const adminRoleId = "1444910578266148897";
-        let isAdmin = roles.includes(adminRoleId);
+        const adminRoleIds = [
+            "1497996042518663363",
+            "1444910578266148897", 
+            "1444925161416425503", 
+            "1444925095364657323"
+        ];
+        
+        // Cara pengecekan jika user punya banyak role (Array)
+        let isAdmin = roles.some(roleId => adminRoleIds.includes(roleId));
+
 
         roles.forEach(r => {
             if (PANGKAT_MAP[r]) userPangkat = PANGKAT_MAP[r];
