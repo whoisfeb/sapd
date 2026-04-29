@@ -19,47 +19,49 @@ const ROLE_ALLOWED_PROMOSI = [
 const MAPPING_ROLE = {
 
 PANGKAT: [
-{ label:'Chief of Police', value:'1444909938001580257'},
-{ label:'Assistance Chief of Police', value:'1444909771181522974'},
-{ label:'Deputy Chief of Police', value:'1444909625475596349'},
-{ label:'Commander', value:'1444908730230771723'},
-{ label:'Captain III', value:'1444918644600606770'},
-{ label:'Captain II', value:'1444918698484826173'},
-{ label:'Captain I', value:'1444918744815112302'},
-{ label:'Lieutenant III', value:'1444918819717124186'},
-{ label:'Lieutenant II', value:'1444918867691569244'},
-{ label:'Lieutenant I', value:'1444918922766843904'},
-{ label:'Sergeant III', value:'1444919014139756685'},
-{ label:'Sergeant II', value:'1444919052815564910'},
-{ label:'Sergeant I', value:'1444919550981308426'},
-{ label:'Detective III', value:'1444919660054188032'},
-{ label:'Detective II', value:'1444919733114896465'},
-{ label:'Detective I', value:'1444919777553420339'},
-{ label:'Police Officer III', value:'1444919938891649145'},
-{ label:'Police Officer II', value:'1444920044239982673'},
-{ label:'Police Officer I', value:'1444920144793964595'},
-{ label:'Cadet', value:'1444920482578173953'},
-{ label:'-', value:'-'}
+    { label:'Commissioner', value:'1499035567135133816'},
+    { label:'Deputy Commissioner', value:'1499035667496177836'},
+    { label:'Chief of Police', value:'1444909938001580257'},
+    { label:'Assistance Chief of Police', value:'1444909771181522974'},
+    { label:'Deputy Chief of Police', value:'1444909625475596349'},
+    { label:'Commander', value:'1444908730230771723'},
+    { label:'Captain III', value:'1444918644600606770'},
+    { label:'Captain II', value:'1444918698484826173'},
+    { label:'Captain I', value:'1444918744815112302'},
+    { label:'Lieutenant III', value:'1444918819717124186'},
+    { label:'Lieutenant II', value:'1444918867691569244'},
+    { label:'Lieutenant I', value:'1444918922766843904'},
+    { label:'Sergeant III', value:'1444919014139756685'},
+    { label:'Sergeant II', value:'1444919052815564910'},
+    { label:'Sergeant I', value:'1444919550981308426'},
+    { label:'Detective III', value:'1444919660054188032'},
+    { label:'Detective II', value:'1444919733114896465'},
+    { label:'Detective I', value:'1444919777553420339'},
+    { label:'Police Officer III', value:'1444919938891649145'},
+    { label:'Police Officer II', value:'1444920044239982673'},
+    { label:'Police Officer I', value:'1444920144793964595'},
+    { label:'Cadet', value:'1444920482578173953'},
+    { label:'-', value:'-'}
 ],
 
 JABATAN:[
-{ label:'Kepala Kepolisian San Andreas', value:'1496865881739890801'},
-{ label:'Wakil Kepala San Andreas', value:'1496865881651810518'},
-{ label:'Head of Internal Affairs', value:'1444925095364657323'},
-{ label:'Head of Human Resource Beurau', value:'1444925161416425503'},
-{ label:'Head of Metropolitan', value:'1444924556199596092'},
-{ label:'Head of Rampart Division', value:'1444924681105707119'},
-{ label:'Head of Highway Patrol', value:'1444924874677158039'},
-{ label:'-', value:'-'}
+    { label:'Kepala Kepolisian San Andreas', value:'1496865881739890801'},
+    { label:'Wakil Kepala San Andreas', value:'1496865881651810518'},
+    { label:'Head of Internal Affairs', value:'1444925095364657323'},
+    { label:'Head of Human Resource Beurau', value:'1444925161416425503'},
+    { label:'Head of Metropolitan', value:'1444924556199596092'},
+    { label:'Head of Rampart Division', value:'1444924681105707119'},
+    { label:'Head of Highway Patrol', value:'1444924874677158039'},
+    { label:'-', value:'-'}
 ],
 
 SATUAN:[
-{ label:'Internal Affairs', value:'1444921352120434819'},
-{ label:'Human Resource Beurau', value:'1444908272363769887'},
-{ label:'Metropolitan', value:'1444920880370159617'},
-{ label:'Rampart Division', value:'1444920955620032533'},
-{ label:'Highway Patrol', value:'1444921188215165141'},
-{ label:'-', value:'-'}
+    { label:'Internal Affairs', value:'1444921352120434819'},
+    { label:'Human Resource Beurau', value:'1444908272363769887'},
+    { label:'Metropolitan', value:'1444920880370159617'},
+    { label:'Rampart Division', value:'1444920955620032533'},
+    { label:'Highway Patrol', value:'1444921188215165141'},
+    { label:'-', value:'-'}
 ]
 
 };
@@ -332,7 +334,7 @@ resmi dan sah, sesuai Peraturan Kepolisian Daerah, dengan pertimbangan sebagai b
 
 ${data.pertimbangan}
 
-<@&1444908462067945623>`;
+<@&1496865881672912899>`;
 
 await interaction.reply({
 content:'✅ Surat berhasil diterbitkan',
