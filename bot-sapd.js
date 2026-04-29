@@ -29,12 +29,23 @@ const client = new Client({
 });
 
 // --- DAFTAR ID (KONFIGURASI) ---
+// --- KONFIGURASI CHANNEL & DISCORD ---
 const ANNOUNCEMENT_CHANNEL_ID = "1492812998379700246"; 
 const FORUM_CHANNEL_ID = "1493936917803302912"; 
 const STORAGE_BUCKET_NAME = "bukti-absen"; 
-const REQUIRED_ROLE_ID = "1444908462067945623"; 
-const ADMIN_ROLE_ID = "1444910578266148897"; 
 const DISCORD_GUILD_ID = "1444893321448390689";
+
+// --- KONFIGURASI ROLE ---
+const REQUIRED_ROLE_ID = "1444908462067945623"; // Role Utama (SAPD)
+
+// Ubah menjadi Array agar bisa menampung lebih dari 1 ID
+const ADMIN_ROLE_IDS = [
+    "1497996042518663363",
+            "1444910578266148897", 
+            "1444925161416425503", 
+            "1444925095364657323"
+];
+
 
 // --- MAPPING PANGKAT ---
 const PANGKAT_MAP = {
@@ -698,25 +709,30 @@ async function runSapdTask() {
             if (member.roles.cache.has(REQUIRED_ROLE_ID)) {
                 let pnk = "-";
                 let div = "-";
-
+        
                 member.roles.cache.forEach(role => {
                     if (PANGKAT_MAP[role.id]) pnk = PANGKAT_MAP[role.id];
                     if (DIVISI_MAP[role.id]) div = DIVISI_MAP[role.id];
                 });
-
+        
                 const namaDisplay = member.nickname || member.user.username;
                 idsAktif.push(member.id);
-
+        
+                // --- Perbaikan di bagian is_admin ---
+                // Pengecekan apakah user memiliki salah satu ID yang ada di dalam array ADMIN_ROLE_IDS
+                const checkAdmin = member.roles.cache.some(role => ADMIN_ROLE_IDS.includes(role.id));
+        
                 arrayDataMaster.push({
                     discord_id: member.id,
                     nama_anggota: namaDisplay,
                     pangkat: pnk,
                     divisi: div,
-                    is_admin: member.roles.cache.has(ADMIN_ROLE_ID),
+                    is_admin: checkAdmin,
                     last_login: new Date().toISOString()
                 });
             }
         });
+
 
         // Simpan data terbaru
         if (arrayDataMaster.length > 0) {
