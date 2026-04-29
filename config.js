@@ -3,8 +3,8 @@
 // PENTING: Gunakan window. agar variabel bisa diakses oleh file HTML lain
 window.CONFIG = {
     DAFTAR_GAJI: {
-        "COMMISSIONNER": 100000,
-        "DEPUTY COMMISSIONNER": 90000,
+        "COMMISSIONER": 100000,
+        "DEPUTY COMMISSIONER": 90000,
         "CHIEF OF POLICE": 80000,
         "ASSISTANT CHIEF OF POLICE": 76000,
         "DEPUTY CHIEF OF POLICE": 72000,
@@ -34,8 +34,8 @@ window.CONFIG = {
 
 // Tambahkan variabel ini untuk memperbaiki error "RANK_ORDER is not defined"
 window.RANK_ORDER = {
-    "COMMISSIONNER": 1,
-    "DEPUTY COMMISSIONNER": 2,
+    "COMMISSIONER": 1,
+    "DEPUTY COMMISSIONER": 2,
     "CHIEF OF POLICE": 3,
     "ASSISTANT CHIEF OF POLICE": 4,
     "DEPUTY CHIEF OF POLICE": 5,
