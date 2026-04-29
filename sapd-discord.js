@@ -23,6 +23,7 @@ const NOTIF_CHANNEL_ID = '1493137414175326249';
 const WARGA_ROLE_ID = '1444908142587547658';       // Role: Warga Excellence
 const POLICE_MAIN_ROLE_ID = '1444908462067945623'; // Role: Excellence Police
 
+
 // ==========================================
 // --- 1. MAPPING PREFIX NICKNAME ---
 // ==========================================
@@ -48,7 +49,7 @@ const rankPrefixes = {
     '1444919938891649145': 'PO III',
     '1444920044239982673': 'PO II',
     '1444920144793964595': 'PO I',
-    '1444920482578173953': 'CADET',
+    '1444920482578173953': 'CADET'
 };
 
 // ==========================================
@@ -76,7 +77,7 @@ const groupRoles = {
     '1444909771181522974': '1444910578266148897',
     '1444909938001580257': '1444910578266148897',
     '1499035567135133816': '1497996042518663363', // Group: Central Command
-    '1499035667496177836': ;1497996042518663363',
+    '1499035667496177836': '1497996042518663363'
 };
 
 // ==========================================
@@ -88,24 +89,26 @@ const groupRoleIDs = [
     '1469596428706910292', // Group: Supervisor
     '1444910648516415488', // Group: Command Team
     '1444910578266148897', // Group: High Command
-    '1497996042518663363', // Group: Central Command
+    '1497996042518663363' // Group: Central Command
 ];
 
 // ==========================================
 // --- 3. DAFTAR MEMBERSIHKAN ROLE POLISI ---
 // ==========================================
 const allGroupIDs = [
-    POLICE_MAIN_ROLE_ID,    // Excellence Police
-    '1444918351037206570', // Group: Police Officer
-    '1444918302508843139', // Group: Detective
-    '1469596428706910292', // Group: Supervisor
-    '1444910648516415488', // Group: Command Team
-    '1444910578266148897', // Group: High Command
-    '1444921188215165141',  // Group: HIGHWAY PATROL
-    '1444920955620032533', // Group: RAMPART
-    '1444920880370159617', // Group: MERTOPOLITAN
-    '1444921352120434819', // Group: IAD
-    '1444908272363769887', // Group: HRB
+    POLICE_MAIN_ROLE_ID,
+    '1496865881739890800',
+    '1496865881706201281',
+    '1496865881698074695',
+    '1496865881698074691',
+    '1496865881681166465',
+    '1496865881727176759',
+    '1496865881727176758',
+    '1496865881672912905',
+    '1496865881672912904',
+    '1496865881672912903',
+    '1496865881672912902',
+    '1496865881672912901'
 ];
 
 // ==========================================
@@ -236,7 +239,7 @@ h. Status :
 Bersama ini saya membuat surat secara
 resmi dan sah, sesuai Peraturan Kepolisian Daerah, dengan pertimbangan sebagai berikut :
 
-<@&1496865881672912899>
+<@&1444908462067945623>
 `);
 
     // PESAN 2
@@ -273,7 +276,7 @@ h. Status : tag status (PROMOSI / DEMOSI / ROTASI / RESIGN / PTDH)
 Bersama ini saya membuat surat secara
 resmi dan sah, sesuai Peraturan Kepolisian Daerah, dengan pertimbangan sebagai berikut :
 
-<@&1496865881672912899>
+<@&1444908462067945623>
 `);
 
     // PESAN 3
@@ -308,7 +311,7 @@ h. Status : PTDH atau RESIGN (pilih salah satunya)
 Bersama ini saya membuat surat secara
 resmi dan sah, sesuai Peraturan Kepolisian Daerah, dengan pertimbangan sebagai berikut :
 
-<@&1496865881672912899>
+<@&1444908462067945623>
 
 ⚠️ **Catatan:**
 • Gunakan **mention user** untuk nama
