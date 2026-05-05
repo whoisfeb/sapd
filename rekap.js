@@ -124,9 +124,9 @@ async function loadData() {
         
         const getIcon = (idx) => {
             const data = u.days[idx];
-            if (!data) return `<span class="cross-icon">✘</span>`;
+            if (!data) return `<span class="cross-icon">A</span>`;
             
-            let label = "✔";
+            let label = "H";
             let iconClass = "check-icon";
             if (data.status === "IZIN") { label = "I"; iconClass = "status-ic"; }
             if (data.status === "CUTI") { label = "C"; iconClass = "status-ic"; }
