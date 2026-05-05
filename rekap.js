@@ -513,34 +513,92 @@ async function updateDiscordList() {
 
 // --- 6. EXPORT TOOLS (EXCEL & PDF) ---
 function downloadExcel() {
-    const rows = [["Nama Anggota", "Pangkat", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Total", "Gaji"]];
+    const rows = [["Nama", "Pangkat", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Total", "Gaji"]];
+    const ws_data = [];
+
     document.querySelectorAll("#tbody-weekly tr").forEach(tr => {
-        const rowData = [];
+        const row = [];
+
         tr.querySelectorAll("td").forEach((td, i) => {
-            if(i < 10) {
-                let val = td.innerText.trim();
-                if(td.querySelector(".check-icon")) val = "HADIR";
-                else if(td.querySelector(".cross-icon")) val = "ALPA";
-                rowData.push(val);
+            if (i < 10) {
+                let val = "";
+                let style = {};
+
+                if (td.querySelector(".check-icon")) {
+                    val = "H";
+                    style = { fill: { fgColor: { rgb: "C6EFCE" } } }; // hijau
+                }
+                else if (td.querySelector(".cross-icon")) {
+                    val = "A";
+                    style = { fill: { fgColor: { rgb: "FFC7CE" } } }; // merah
+                }
+                else if (td.innerText.includes("I")) {
+                    val = "I";
+                    style = { fill: { fgColor: { rgb: "FFF2CC" } } }; // kuning
+                }
+                else if (td.innerText.includes("C")) {
+                    val = "C";
+                    style = { fill: { fgColor: { rgb: "FCE4D6" } } }; // orange
+                }
+                else {
+                    val = td.innerText.trim();
+                }
+
+                row.push({ v: val, s: style });
             }
         });
-        rows.push(rowData);
+
+        ws_data.push(row);
     });
-    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Rekap");
-    XLSX.writeFile(wb, `Rekap_SAPD.xlsx`);
+
+    XLSX.writeFile(wb, "Rekap_SAPD.xlsx");
 }
 
 function downloadPDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('l', 'mm', 'a4');
+
+    const body = [];
+
+    document.querySelectorAll("#tbody-weekly tr").forEach(tr => {
+        const row = [];
+
+        tr.querySelectorAll("td").forEach((td, i) => {
+            if (i < 10) {
+                let val = "-";
+
+                if (td.querySelector(".check-icon")) val = "H";
+                else if (td.querySelector(".cross-icon")) val = "A";
+                else if (td.innerText.includes("I")) val = "I";
+                else if (td.innerText.includes("C")) val = "C";
+                else val = td.innerText.trim();
+
+                row.push(val);
+            }
+        });
+
+        body.push(row);
+    });
+
     doc.autoTable({
-        html: '#table-rekap',
-        columns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        head: [["Nama", "Pangkat", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Total", "Gaji"]],
+        body: body,
+        didParseCell: function (data) {
+            const val = data.cell.text[0];
+
+            if (val === "H") data.cell.styles.fillColor = [198, 239, 206]; // hijau
+            if (val === "A") data.cell.styles.fillColor = [255, 199, 206]; // merah
+            if (val === "I") data.cell.styles.fillColor = [255, 242, 204]; // kuning
+            if (val === "C") data.cell.styles.fillColor = [252, 228, 214]; // orange
+        },
         theme: 'grid'
     });
-    doc.save(`Rekap_SAPD.pdf`);
+
+    doc.save("Rekap_SAPD.pdf");
 }
 
 // --- 7. UTILS & DATA MANAGEMENT ---
