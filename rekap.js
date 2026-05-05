@@ -70,42 +70,60 @@ async function loadData() {
 
     userWeekly = {}; 
     masters.forEach(m => {
-        userWeekly[m.discord_id] = { 
-            info: m, 
-            days: { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null }, 
+    userWeekly[m.discord_id] = { 
+        info: m, 
+        days: { 
+            1: { status: "ALPA" },
+            2: { status: "ALPA" },
+            3: { status: "ALPA" },
+            4: { status: "ALPA" },
+            5: { status: "ALPA" },
+            6: { status: "ALPA" }
+        }, 
             totalHadir: 0,
             uniqueDates: new Set() 
         };
     });
 
     logs.forEach(log => {
-        const d = new Date(log.created_at).getDay();
-        const dateKey = new Date(log.created_at).toISOString().split('T')[0];
-        const discordId = log.discord_id;
+    const d = new Date(log.created_at).getDay();
+    const dateKey = new Date(log.created_at).toISOString().split('T')[0];
+    const discordId = log.discord_id;
 
-        if (userWeekly[discordId] && d !== 0) {
-            const ketAsli = (log.jam_duty || "").toUpperCase();
-            const status = ketAsli.includes("IZIN") ? "IZIN" : (ketAsli.includes("CUTI") ? "CUTI" : "HADIR");
+    // 🔥 TAMBAHAN PENTING (ANTI ERROR & DATA KEBUANG)
+    if (!userWeekly[discordId]) return;
+    if (d === 0) return; // skip minggu
 
-            userWeekly[discordId].days[d] = { 
-                status: status, 
-                tipe_absen: log.tipe_absen || status,
-                ket: (log.jam_duty || "").toUpperCase(),
-                alasan: log.alasan || "-", 
-                waktuDuty: log.jam_duty || "-", 
-                bukti: log.bukti_foto || log.bukti_gambar,
-                tanggalLog: new Date(log.created_at).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' }),
-                divisi: userWeekly[discordId].info.divisi || "-"
-            };
+    const ketAsli = (log.jam_duty || "").toUpperCase();
 
-            if (status === "HADIR") {
-                if (!userWeekly[discordId].uniqueDates.has(dateKey)) {
-                    userWeekly[discordId].totalHadir++; 
-                    userWeekly[discordId].uniqueDates.add(dateKey); 
-                }
-            }
+    // 🔥 PERBAIKAN STATUS (LEBIH AMAN)
+    let status = "HADIR";
+
+    if (ketAsli.includes("IZIN")) status = "IZIN";
+    else if (ketAsli.includes("CUTI")) status = "CUTI";
+
+    // 🔥 SIMPAN DATA (OVERRIDE ALPA)
+    userWeekly[discordId].days[d] = { 
+        status: status, 
+        tipe_absen: log.tipe_absen || status,
+        ket: ketAsli,
+        alasan: log.alasan || "-", 
+        waktuDuty: log.jam_duty || "-", 
+        bukti: log.bukti_foto || log.bukti_gambar,
+        tanggalLog: new Date(log.created_at).toLocaleDateString('id-ID', { 
+            weekday: 'long', day: 'numeric', month: 'short' 
+        }),
+        divisi: userWeekly[discordId].info.divisi || "-"
+    };
+
+    // 🔥 HITUNG HADIR
+    if (status === "HADIR") {
+        if (!userWeekly[discordId].uniqueDates.has(dateKey)) {
+            userWeekly[discordId].totalHadir++; 
+            userWeekly[discordId].uniqueDates.add(dateKey); 
         }
-    });
+    }
+});
 
     let totalGajiSemua = 0;
     const currentAdminName = localStorage.getItem("nama_user");
@@ -124,15 +142,29 @@ async function loadData() {
         
         const getIcon = (idx) => {
             const data = u.days[idx];
-            if (!data) return `<span class="cross-icon">A</span>`;
-            
+        
+            // kalau tidak ada atau ALPA
+            if (!data || data.status === "ALPA") {
+                return `<span class="cross-icon">A</span>`;
+            }
+        
             let label = "H";
             let iconClass = "check-icon";
-            if (data.status === "IZIN") { label = "I"; iconClass = "status-ic"; }
-            if (data.status === "CUTI") { label = "C"; iconClass = "status-ic"; }
-
+        
+            if (data.status === "IZIN") {
+                label = "I";
+                iconClass = "status-ic";
+            }
+        
+            if (data.status === "CUTI") {
+                label = "C";
+                iconClass = "status-ic";
+            }
+        
             const dataStr = JSON.stringify(data).replace(/"/g, '&quot;');
-            return `<span class="${iconClass}" style="cursor:pointer;" onclick="openDetailPopup('${m.nama_anggota}', '${m.pangkat}', ${dataStr})">${label}</span>`;
+        
+            return `<span class="${iconClass}" style="cursor:pointer;" 
+                onclick="openDetailPopup('${m.nama_anggota}', '${m.pangkat}', ${dataStr})">${label}</span>`;
         };
 
         return `<tr>
