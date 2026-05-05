@@ -70,60 +70,42 @@ async function loadData() {
 
     userWeekly = {}; 
     masters.forEach(m => {
-    userWeekly[m.discord_id] = { 
-        info: m, 
-        days: { 
-            1: { status: "ALPA" },
-            2: { status: "ALPA" },
-            3: { status: "ALPA" },
-            4: { status: "ALPA" },
-            5: { status: "ALPA" },
-            6: { status: "ALPA" }
-        }, 
+        userWeekly[m.discord_id] = { 
+            info: m, 
+            days: { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null }, 
             totalHadir: 0,
             uniqueDates: new Set() 
         };
     });
 
     logs.forEach(log => {
-    const d = new Date(log.created_at).getDay();
-    const dateKey = new Date(log.created_at).toISOString().split('T')[0];
-    const discordId = log.discord_id;
+        const d = new Date(log.created_at).getDay();
+        const dateKey = new Date(log.created_at).toISOString().split('T')[0];
+        const discordId = log.discord_id;
 
-    // 🔥 TAMBAHAN PENTING (ANTI ERROR & DATA KEBUANG)
-    if (!userWeekly[discordId]) return;
-    if (d === 0) return; // skip minggu
+        if (userWeekly[discordId] && d !== 0) {
+            const ketAsli = (log.jam_duty || "").toUpperCase();
+            const status = ketAsli.includes("IZIN") ? "IZIN" : (ketAsli.includes("CUTI") ? "CUTI" : "HADIR");
 
-    const ketAsli = (log.jam_duty || "").toUpperCase();
+            userWeekly[discordId].days[d] = { 
+                status: status, 
+                tipe_absen: log.tipe_absen || status,
+                ket: (log.jam_duty || "").toUpperCase(),
+                alasan: log.alasan || "-", 
+                waktuDuty: log.jam_duty || "-", 
+                bukti: log.bukti_foto || log.bukti_gambar,
+                tanggalLog: new Date(log.created_at).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' }),
+                divisi: userWeekly[discordId].info.divisi || "-"
+            };
 
-    // 🔥 PERBAIKAN STATUS (LEBIH AMAN)
-    let status = "HADIR";
-
-    if (ketAsli.includes("IZIN")) status = "IZIN";
-    else if (ketAsli.includes("CUTI")) status = "CUTI";
-
-    // 🔥 SIMPAN DATA (OVERRIDE ALPA)
-    userWeekly[discordId].days[d] = { 
-        status: status, 
-        tipe_absen: log.tipe_absen || status,
-        ket: ketAsli,
-        alasan: log.alasan || "-", 
-        waktuDuty: log.jam_duty || "-", 
-        bukti: log.bukti_foto || log.bukti_gambar,
-        tanggalLog: new Date(log.created_at).toLocaleDateString('id-ID', { 
-            weekday: 'long', day: 'numeric', month: 'short' 
-        }),
-        divisi: userWeekly[discordId].info.divisi || "-"
-    };
-
-    // 🔥 HITUNG HADIR
-    if (status === "HADIR") {
-        if (!userWeekly[discordId].uniqueDates.has(dateKey)) {
-            userWeekly[discordId].totalHadir++; 
-            userWeekly[discordId].uniqueDates.add(dateKey); 
+            if (status === "HADIR") {
+                if (!userWeekly[discordId].uniqueDates.has(dateKey)) {
+                    userWeekly[discordId].totalHadir++; 
+                    userWeekly[discordId].uniqueDates.add(dateKey); 
+                }
+            }
         }
-    }
-});
+    });
 
     let totalGajiSemua = 0;
     const currentAdminName = localStorage.getItem("nama_user");
@@ -142,29 +124,15 @@ async function loadData() {
         
         const getIcon = (idx) => {
             const data = u.days[idx];
-        
-            // kalau tidak ada atau ALPA
-            if (!data || data.status === "ALPA") {
-                return `<span class="cross-icon">A</span>`;
-            }
-        
+            if (!data) return `<span class="cross-icon">A</span>`;
+            
             let label = "H";
             let iconClass = "check-icon";
-        
-            if (data.status === "IZIN") {
-                label = "I";
-                iconClass = "status-ic";
-            }
-        
-            if (data.status === "CUTI") {
-                label = "C";
-                iconClass = "status-ic";
-            }
-        
+            if (data.status === "IZIN") { label = "I"; iconClass = "status-ic"; }
+            if (data.status === "CUTI") { label = "C"; iconClass = "status-ic"; }
+
             const dataStr = JSON.stringify(data).replace(/"/g, '&quot;');
-        
-            return `<span class="${iconClass}" style="cursor:pointer;" 
-                onclick="openDetailPopup('${m.nama_anggota}', '${m.pangkat}', ${dataStr})">${label}</span>`;
+            return `<span class="${iconClass}" style="cursor:pointer;" onclick="openDetailPopup('${m.nama_anggota}', '${m.pangkat}', ${dataStr})">${label}</span>`;
         };
 
         return `<tr>
@@ -545,112 +513,34 @@ async function updateDiscordList() {
 
 // --- 6. EXPORT TOOLS (EXCEL & PDF) ---
 function downloadExcel() {
-    const rows = [["Nama", "Pangkat", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Total", "Gaji"]];
-    const ws_data = [];
-
+    const rows = [["Nama Anggota", "Pangkat", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Total", "Gaji"]];
     document.querySelectorAll("#tbody-weekly tr").forEach(tr => {
-        const row = [];
-
+        const rowData = [];
         tr.querySelectorAll("td").forEach((td, i) => {
-    if (i < 10) {
-        let val = "";
-        let style = {};
-
-        // HADIR
-        if (td.querySelector(".check-icon")) {
-            val = "H";
-            style = { fill: { fgColor: { rgb: "C6EFCE" } } }; // hijau
-        }
-
-        // ALPA
-        else if (td.querySelector(".cross-icon")) {
-            val = "A";
-            style = { fill: { fgColor: { rgb: "FFC7CE" } } }; // merah
-        }
-
-        // IZIN / CUTI (pakai class, bukan includes)
-        else if (td.querySelector(".status-ic")) {
-            const text = td.innerText.trim();
-
-            if (text === "I") {
-                val = "I";
-                style = { fill: { fgColor: { rgb: "FFF2CC" } } }; // kuning
+            if(i < 10) {
+                let val = td.innerText.trim();
+                if(td.querySelector(".check-icon")) val = "HADIR";
+                else if(td.querySelector(".cross-icon")) val = "ALPA";
+                rowData.push(val);
             }
-            else if (text === "C") {
-                val = "C";
-                style = { fill: { fgColor: { rgb: "FCE4D6" } } }; // orange
-            }
-        }
-
-        // selain itu (Nama, Pangkat, Total, Gaji)
-        else {
-            val = td.innerText.trim();
-        }
-
-        row.push({ v: val, s: style });
-    }
-});
-
-        ws_data.push(row);
+        });
+        rows.push(rowData);
     });
-
-    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    const ws = XLSX.utils.aoa_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Rekap");
-
-    XLSX.writeFile(wb, "Rekap_SAPD.xlsx");
+    XLSX.writeFile(wb, `Rekap_SAPD.xlsx`);
 }
 
 function downloadPDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('l', 'mm', 'a4');
-
-    const body = [];
-
-    document.querySelectorAll("#tbody-weekly tr").forEach(tr => {
-        const row = [];
-
-        tr.querySelectorAll("td").forEach((td, i) => {
-            if (i < 10) {
-                let val = "-";
-
-                if (td.querySelector(".check-icon")) {
-                    val = "H";
-                }
-                else if (td.querySelector(".cross-icon")) {
-                    val = "A";
-                }
-                else if (td.querySelector(".status-ic")) {
-                    const text = td.innerText.trim();
-                    if (text === "I") val = "I";
-                    else if (text === "C") val = "C";
-                }
-                else {
-                    val = td.innerText.trim();
-                }
-
-                row.push(val);
-            }
-        });
-
-        body.push(row);
-    });
-
     doc.autoTable({
-        head: [["Nama", "Pangkat", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Total", "Gaji"]],
-        body: body,
-        didParseCell: function (data) {
-            const val = data.cell.text[0];
-        
-            if (val === "H") data.cell.styles.fillColor = [198, 239, 206]; // hijau
-            else if (val === "A") data.cell.styles.fillColor = [255, 199, 206]; // merah
-            else if (val === "I") data.cell.styles.fillColor = [255, 242, 204]; // kuning
-            else if (val === "C") data.cell.styles.fillColor = [252, 228, 214]; // orange
-        }
+        html: '#table-rekap',
+        columns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
         theme: 'grid'
     });
-
-    doc.save("Rekap_SAPD.pdf");
+    doc.save(`Rekap_SAPD.pdf`);
 }
 
 // --- 7. UTILS & DATA MANAGEMENT ---
