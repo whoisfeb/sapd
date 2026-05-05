@@ -552,33 +552,44 @@ function downloadExcel() {
         const row = [];
 
         tr.querySelectorAll("td").forEach((td, i) => {
-            if (i < 10) {
-                let val = "";
-                let style = {};
+    if (i < 10) {
+        let val = "";
+        let style = {};
 
-                if (td.querySelector(".check-icon")) {
-                    val = "H";
-                    style = { fill: { fgColor: { rgb: "C6EFCE" } } }; // hijau
-                }
-                else if (td.querySelector(".cross-icon")) {
-                    val = "A";
-                    style = { fill: { fgColor: { rgb: "FFC7CE" } } }; // merah
-                }
-                else if (td.innerText.includes("I")) {
-                    val = "I";
-                    style = { fill: { fgColor: { rgb: "FFF2CC" } } }; // kuning
-                }
-                else if (td.innerText.includes("C")) {
-                    val = "C";
-                    style = { fill: { fgColor: { rgb: "FCE4D6" } } }; // orange
-                }
-                else {
-                    val = td.innerText.trim();
-                }
+        // HADIR
+        if (td.querySelector(".check-icon")) {
+            val = "H";
+            style = { fill: { fgColor: { rgb: "C6EFCE" } } }; // hijau
+        }
 
-                row.push({ v: val, s: style });
+        // ALPA
+        else if (td.querySelector(".cross-icon")) {
+            val = "A";
+            style = { fill: { fgColor: { rgb: "FFC7CE" } } }; // merah
+        }
+
+        // IZIN / CUTI (pakai class, bukan includes)
+        else if (td.querySelector(".status-ic")) {
+            const text = td.innerText.trim();
+
+            if (text === "I") {
+                val = "I";
+                style = { fill: { fgColor: { rgb: "FFF2CC" } } }; // kuning
             }
-        });
+            else if (text === "C") {
+                val = "C";
+                style = { fill: { fgColor: { rgb: "FCE4D6" } } }; // orange
+            }
+        }
+
+        // selain itu (Nama, Pangkat, Total, Gaji)
+        else {
+            val = td.innerText.trim();
+        }
+
+        row.push({ v: val, s: style });
+    }
+});
 
         ws_data.push(row);
     });
@@ -603,11 +614,20 @@ function downloadPDF() {
             if (i < 10) {
                 let val = "-";
 
-                if (td.querySelector(".check-icon")) val = "H";
-                else if (td.querySelector(".cross-icon")) val = "A";
-                else if (td.innerText.includes("I")) val = "I";
-                else if (td.innerText.includes("C")) val = "C";
-                else val = td.innerText.trim();
+                if (td.querySelector(".check-icon")) {
+                    val = "H";
+                }
+                else if (td.querySelector(".cross-icon")) {
+                    val = "A";
+                }
+                else if (td.querySelector(".status-ic")) {
+                    const text = td.innerText.trim();
+                    if (text === "I") val = "I";
+                    else if (text === "C") val = "C";
+                }
+                else {
+                    val = td.innerText.trim();
+                }
 
                 row.push(val);
             }
@@ -621,12 +641,12 @@ function downloadPDF() {
         body: body,
         didParseCell: function (data) {
             const val = data.cell.text[0];
-
+        
             if (val === "H") data.cell.styles.fillColor = [198, 239, 206]; // hijau
-            if (val === "A") data.cell.styles.fillColor = [255, 199, 206]; // merah
-            if (val === "I") data.cell.styles.fillColor = [255, 242, 204]; // kuning
-            if (val === "C") data.cell.styles.fillColor = [252, 228, 214]; // orange
-        },
+            else if (val === "A") data.cell.styles.fillColor = [255, 199, 206]; // merah
+            else if (val === "I") data.cell.styles.fillColor = [255, 242, 204]; // kuning
+            else if (val === "C") data.cell.styles.fillColor = [252, 228, 214]; // orange
+        }
         theme: 'grid'
     });
 
